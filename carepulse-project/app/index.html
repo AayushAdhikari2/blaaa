@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carepulse HMS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors.css">
+<link rel="stylesheet" href="theme.css">
+</head><body>
+<header class="nav"><div class="wrap nav-in">
+  <a href="../" class="logo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2ba67a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h5l2-6 4 12 2-6h7"/></svg>Carepulse HMS</a>
+  <nav class="links" id="nav"></nav>
+  <div class="nav-cta"><span class="muted" id="who"></span><button class="btn ghost sm" id="out" hidden>Log out</button></div>
+</div></header>
+<section class="hero"><div class="wrap"><span class="pill"><b class="tag">LIVE</b> <span id="ptitle">Patient status</span></span>
+  <h1 id="h1">Know exactly where you are in the queue.</h1><p class="sub" id="sub">Enter your bill number and code to see your waiting number, report status and bill.</p></div></section>
+<main class="wrap">
+<section id="login" hidden><div class="card" style="max-width:380px"><h2>Staff login</h2>
+  <label>Email</label><input id="le" type="email" autocomplete="username"><label>Password</label><input id="lp" type="password" autocomplete="current-password">
+  <button class="btn full" id="lgo">Log in</button><div class="err" id="lerr"></div></div></section>
+
+<section id="rec" hidden><div class="grid">
+  <div><div class="card"><h2>New registration</h2>
+    <label>Patient name</label><input id="rn"><label>Phone</label><input id="rp" inputmode="tel">
+    <label>Age</label><input id="ra" type="number" min="0" max="120"><label>Doctor</label><select id="rd"></select>
+    <label>Reason for visit</label><input id="rr">
+    <button class="btn full" id="rgo">Register &amp; generate bill</button><div class="err" id="rerr"></div>
+    <div class="slip" id="slip" hidden></div></div>
+    <div class="card"><h2>Online appointment requests</h2><div id="reqs"></div></div></div>
+  <div><div class="card"><h2>Today’s visits</h2><div id="rlist"></div></div>
+    <div class="card"><h2>Billing</h2><label>Visit</label><select id="bsel"></select>
+      <div id="bitems"></div>
+      <div class="inl"><input id="bd" placeholder="Charge (e.g. Consultation)"><input id="ba" type="number" min="0" step="0.01" placeholder="Amount (Rs)" style="max-width:150px"><button class="btn sm" id="badd">Add</button></div>
+      <div class="inl"><button class="btn ghost sm" id="bpaid">Mark paid</button></div></div></div>
+</div></section>
+
+<section id="doc" hidden><div class="card" id="dpick"><label style="margin-top:0">Doctor</label><select id="dsel"></select></div><div id="dview"></div></section>
+<section id="lab" hidden><div class="card"><h2>Reports to prepare</h2><div id="lview"></div></div></section>
+
+<section id="pat" hidden>
+  <div class="card" style="max-width:520px"><h2>Check your status</h2>
+    <label style="margin-top:0">Bill no.</label><input id="pb" placeholder="BL-20261127-0001"><label>Access code</label><input id="pc" inputmode="numeric" maxlength="6">
+    <button class="btn full" id="pgo">Open my status</button><div class="err" id="perr"></div></div>
+  <div id="pres"></div></section>
+
+<section id="book" hidden><div class="card" style="max-width:520px"><h2>Request an appointment</h2>
+  <label style="margin-top:0">Your name</label><input id="bn"><label>Phone</label><input id="bp" inputmode="tel">
+  <label>Doctor</label><select id="bdoc"></select><label>Preferred date</label><input id="bdt" type="date">
+  <label>Reason</label><input id="br"><button class="btn full" id="bgo">Send request</button>
+  <div class="err" id="berr"></div><div class="note" id="bok" hidden>Request received. Reception will confirm by phone.</div></div></section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body></html>
