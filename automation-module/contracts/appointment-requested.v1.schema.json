@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://carepulse.local/automation/contracts/appointment-requested.v1.schema.json",
+  "title": "appointment.requested v1",
+  "description": "Logical event contract for Process 01. LOGICAL envelope is kept separate from PHYSICAL database columns. appointment_id is the correlation identifier. No patient_id. No scheduled_start. preferred_date is NOT part of this event. Recipients are NEVER supplied by the browser; resolved server-side.",
+  "type": "object",
+  "required": ["event_id", "event_type", "schema_version", "source", "source_id", "occurred_at", "payload"],
+  "additionalProperties": false,
+  "properties": {
+    "event_id": { "type": "string", "format": "uuid", "description": "Unique event id. Local V1: deterministic UUIDv5; production outbox: generated once, persisted." },
+    "event_type": { "const": "appointment.requested" },
+    "schema_version": { "const": 1 },
+    "source": { "const": "public.appointments", "description": "Physical origin; separate from logical envelope." },
+    "source_id": { "type": "string", "minLength": 1, "description": "appointments.id (bigint identity), serialized as string. appointment-row-id." },
+    "occurred_at": { "type": "string", "format": "date-time", "description": "ISO-8601 timestamp." },
+    "payload": {
+      "type": "object",
+      "required": ["appointment_id"],
+      "additionalProperties": false,
+      "properties": {
+        "appointment_id": { "type": "string", "minLength": 1, "description": "appointments.id serialized as string. Correlation identifier. NOT patient_id." }
+      }
+    }
+  }
+}

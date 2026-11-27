@@ -1,0 +1,23 @@
+{
+  "name": "carepulse-automation-module",
+  "version": "1.0.0",
+  "description": "Independent Carepulse Hospital Management System automation engine (Process 01: appointment.requested). Demo/local mode only in V1; no live Supabase connectivity.",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test tests/",
+    "dev": "node src/dev.js",
+    "dashboard": "node dashboard/server.js"
+  },
+  "keywords": [
+    "carepulse",
+    "automation",
+    "event-driven",
+    "healthcare"
+  ],
+  "license": "UNLICENSED",
+  "dependencies": {}
+}
