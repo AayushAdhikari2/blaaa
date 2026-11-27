@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Carepulse Automation Engine — Admin Dashboard</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">✚</span>
+      <div>
+        <h1>Carepulse Automation Engine</h1>
+        <p class="subtitle">Hospital technology administration · Process 01: appointment.requested</p>
+      </div>
+    </div>
+    <div class="demo-banner" role="status" aria-live="polite">DEMO MODE — NOT CONNECTED TO SUPABASE</div>
+  </header>
+
+  <nav class="tabs" aria-label="Dashboard sections">
+    <button class="tab active" data-section="overview">Overview</button>
+    <button class="tab" data-section="simulator">Event Simulator</button>
+    <button class="tab" data-section="monitor">Event Monitor</button>
+    <button class="tab" data-section="notifications">Notifications</button>
+    <button class="tab" data-section="executions">Execution History</button>
+    <button class="tab" data-section="retries">Retry Queue</button>
+    <button class="tab" data-section="deadletter">Dead Letter Queue</button>
+    <button class="tab" data-section="audit">Audit Logs</button>
+    <button class="tab" data-section="health">System Health</button>
+  </nav>
+
+  <main id="content">
+    <!-- 1. Overview -->
+    <section id="overview" class="section active">
+      <h2>Overview</h2>
+      <p class="hint">All figures reflect <strong>synthetic demo activity only</strong> — not real hospital data.</p>
+      <div class="cards" id="metric-cards"></div>
+      <div class="panel">
+        <h3>Process 01 — appointment.requested</h3>
+        <p>On <code>INSERT</code> into <code>public.appointments</code> with <code>status=requested</code>, emit
+           <code>appointment.requested</code>; create one in-app notification per eligible staff profile
+           (<code>reception</code> + <code>admin</code>). Doctors, laboratory staff, anonymous users and patients
+           are never notified. Patient identity is not Supabase Auth.</p>
+      </div>
+    </section>
+
+    <!-- 2. Event Simulator -->
+    <section id="simulator" class="section">
+      <h2>Event Simulator</h2>
+      <p class="hint">Generates a synthetic <code>appointment.requested</code> event. No real patient data; no database.</p>
+      <div class="controls">
+        <label>Synthetic appointment id <input id="sim-appointment-id" type="text" placeholder="(auto)"></label>
+        <button id="btn-generate">Generate synthetic appointment request</button>
+      </div>
+      <pre id="sim-event" class="json">no event generated yet</pre>
+      <div class="controls">
+        <button id="btn-process" class="primary">Process event</button>
+        <button id="btn-dryrun">Run dry-run</button>
+        <button id="btn-tempfail">Simulate temporary failure</button>
+        <button id="btn-permfail">Simulate permanent failure</button>
+        <button id="btn-replay-event">Replay eligible event</button>
+      </div>
+      <h3>Result</h3>
+      <pre id="sim-result" class="json">—</pre>
+      <h3>Per-recipient results</h3>
+      <div id="sim-per-recipient"></div>
+    </section>
+
+    <!-- 3. Event Monitor -->
+    <section id="monitor" class="section">
+      <h2>Event Monitor</h2>
+      <div class="controls"><button id="btn-refresh-events">Refresh</button></div>
+      <div id="events-table"></div>
+    </section>
+
+    <!-- 4. Notifications -->
+    <section id="notifications" class="section">
+      <h2>Notifications</h2>
+      <p class="hint">Recipient-specific in-app notifications. No patient name or phone. Mock/local delivery only.</p>
+      <div class="controls"><button id="btn-refresh-notifications">Refresh</button></div>
+      <div id="notifications-table"></div>
+    </section>
+
+    <!-- 5. Execution History -->
+    <section id="executions" class="section">
+      <h2>Execution History</h2>
+      <p class="hint">Append-only execution + audit records.</p>
+      <div class="controls"><button id="btn-refresh-executions">Refresh</button></div>
+      <div id="executions-table"></div>
+    </section>
+
+    <!-- 6. Retry Queue -->
+    <section id="retries" class="section">
+      <h2>Retry Queue</h2>
+      <p class="hint">Bounded exponential backoff · max attempts · transient/permanent classification · retry timestamps.
+         Not a reliable browser timer; production uses a trusted server-side worker.</p>
+      <div class="controls">
+        <button id="btn-process-due" class="primary">Retry failed delivery / process due</button>
+        <button id="btn-refresh-retries">Refresh</button>
+      </div>
+      <div id="retries-table"></div>
+    </section>
+
+    <!-- 7. Dead Letter Queue -->
+    <section id="deadletter" class="section">
+      <h2>Dead Letter Queue</h2>
+      <p class="hint">Terminal failures awaiting manual review. Manual replay is safe + idempotent.</p>
+      <div class="controls"><button id="btn-refresh-dead">Refresh</button></div>
+      <div id="dead-table"></div>
+    </section>
+
+    <!-- 8. Audit Logs -->
+    <section id="audit" class="section">
+      <h2>Audit Logs</h2>
+      <p class="hint">Append-only. Sanitized — no patient names, phones, access codes, passwords, tokens, secrets.</p>
+      <div class="controls"><button id="btn-refresh-audit">Refresh</button></div>
+      <div id="audit-table"></div>
+    </section>
+
+    <!-- 9. System Health -->
+    <section id="health" class="section">
+      <h2>System Health</h2>
+      <div class="controls"><button id="btn-refresh-health">Refresh</button></div>
+      <pre id="health-json" class="json">—</pre>
+      <div class="panel">
+        <h3>Synthetic recipients</h3>
+        <div id="recipients"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>Carepulse Automation Engine V1 · independent module · synthetic data only · no live Supabase</footer>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

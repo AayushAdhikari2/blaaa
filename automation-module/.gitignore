@@ -1,0 +1,10 @@
+# Runtime state — never commit
+.local/
+node_modules/
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
