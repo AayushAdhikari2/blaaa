@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2ba67a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="../assets/icons/icon-192.png">
+<link rel="apple-touch-icon" href="../assets/icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="RADIX AI">
+<title>RADIX AI</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/colors.css">
+<link rel="stylesheet" href="../css/app.css">
+</head><body>
+<header class="nav"><div class="wrap nav-in">
+  <a href="../" class="logo"><svg class="mark" width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2ba67a"/><stop offset="1" stop-color="#2f7f86"/></linearGradient></defs><rect width="32" height="32" rx="9" fill="url(#rg)"/><path d="M10 23V9h6.2a4.3 4.3 0 0 1 0 8.6H10M16 17.6 22 23" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="wm">RADIX <span class="ai">AI</span></span></a>
+  <div class="nav-cta"><span class="who" id="who"></span><button class="btn ghost sm" id="out" hidden>Log out</button></div>
+</div></header>
+<nav id="nav" class="tabbar" aria-label="Main navigation"></nav>
+<div id="sheetbg" class="sheetbg" hidden></div>
+<div id="sheet" class="sheet" role="dialog" aria-label="More" hidden></div>
+<div id="net" class="net" role="alert" hidden>You are offline. Changes are not saved until the connection is back.</div>
+<section class="hero"><div class="wrap"><span class="pill"><b class="tag">LIVE</b> <span id="ptitle">Patient status</span></span>
+  <h1 id="h1">Know exactly where you are in the queue.</h1><p class="sub" id="sub">Enter your bill number and code to see your waiting number, report status and bill.</p></div></section>
+<main class="wrap">
+<section id="login" hidden><div class="card" style="max-width:380px"><h2>Staff login</h2>
+  <label>Email</label><input id="le" type="email" autocomplete="username" inputmode="email" autocapitalize="off"><label>Password</label><input id="lp" type="password" autocomplete="current-password">
+  <button class="btn full" id="lgo">Log in</button><div class="err" id="lerr"></div></div></section>
+
+<section id="rec" hidden><div class="grid">
+  <div><div class="card"><h2>New registration</h2>
+    <label>Patient name</label><input id="rn"><label>Phone</label><input id="rp" inputmode="tel">
+    <label>Age</label><input id="ra" type="number" min="0" max="120"><label>Doctor</label><select id="rd"></select>
+    <div id="rdup" class="note" hidden></div>
+    <label>Reason for visit</label><input id="rr">
+    <label>Allergies (comma separated, or leave empty)</label><input id="ral" placeholder="e.g. penicillin, dust" maxlength="300">
+    <label class="chk" style="margin-top:12px"><input type="checkbox" id="rsms"> Patient agrees to SMS updates (queue and report messages)</label>
+    <label class="chk" style="margin-top:6px"><input type="checkbox" id="rcons"> Privacy notice explained to the patient</label>
+    <button class="btn full" id="rgo">Register &amp; generate bill</button><div class="err" id="rerr"></div>
+    <div class="slip" id="slip" hidden></div></div>
+    <div class="card"><h2>Online appointment requests</h2><div id="reqs"></div></div></div>
+  <div><div class="card"><h2>Today’s visits</h2><div id="rlist"></div></div>
+    <div class="card"><h2>Billing</h2><label>Visit</label><select id="bsel"></select>
+      <div id="bitems"></div>
+      <div class="inl"><input id="bd" placeholder="Charge (e.g. Consultation)"><input id="ba" type="number" min="0" step="0.01" placeholder="Amount (Rs)" style="max-width:150px"><button class="btn sm" id="badd">Add</button></div>
+      <div class="inl"><button class="btn ghost sm" id="bpaid">Mark paid</button><button class="btn ghost sm" id="bprint">Print bill</button></div></div></div>
+</div></section>
+
+<section id="adm" hidden><div class="subtabs" id="admtabs"></div>
+<div id="adm-team" class="pane"><div class="grid">
+  <div><div class="card"><h2 id="sh">Add staff</h2>
+    <label style="margin-top:0" for="sn">Full name</label><input id="sn" autocomplete="off">
+    <label for="se">Email (used to log in)</label><input id="se" type="email" autocomplete="off">
+    <label for="sp">Password</label><input id="sp" type="text" autocomplete="new-password">
+    <label for="sr">Role</label><select id="sr"><option value="reception">Reception</option><option value="doctor">Doctor</option><option value="lab">Lab</option><option value="pharmacy">Pharmacy</option><option value="admin">Admin</option></select>
+    <div id="sdw" hidden><label for="sd">Which doctor?</label><select id="sd"></select></div>
+    <button class="btn full" id="sgo">Create account</button><button class="btn ghost full" id="scancel" hidden style="margin-top:8px">Cancel</button><div class="err" id="serr"></div></div></div>
+  <div><div class="card"><h2>Staff accounts</h2><div id="astaff"></div></div>
+    <div class="card"><h2>Doctors &amp; departments</h2>
+      <div class="drow dhead"><span>Name</span><span>Department</span><span>Min / patient</span><span></span><span></span></div>
+      <div id="dlist"></div><datalist id="depts"></datalist>
+      <h3 style="margin-top:18px">Add a doctor</h3>
+      <div class="inl"><input id="dn" placeholder="Name (Dr. …)"><input id="dd" list="depts" placeholder="Department"><input id="dm" type="number" min="1" max="120" placeholder="Min / patient" style="max-width:130px"><button class="btn sm" id="dadd">Add</button></div>
+      <div class="err" id="derr"></div>
+      <p class="muted" style="font-size:12px;margin-top:8px">Untick “Active” to hide a doctor from booking and registration. Doctors with past visits cannot be deleted.</p></div></div>
+</div></div>
+<div id="adm-other" class="pane"></div></section>
+
+<section id="doc" hidden><div class="card" id="dpick"><label style="margin-top:0">Doctor</label><select id="dsel"></select></div><div id="dview"></div></section>
+<section id="lab" hidden><div class="card"><h2>Reports to prepare</h2><div id="lview"></div></div></section>
+
+
+<section id="pha" hidden><div class="card"><h2>Prescriptions to dispense</h2><div id="phq"></div></div><div id="phs"></div></section>
+<section id="wrd" hidden><div id="wbody"></div></section>
+<section id="clm" hidden><div id="cbody"></div></section>
+<section id="board" hidden><div class="inl" style="justify-content:flex-end;margin:0 0 10px"><button class="btn ghost sm" id="bfull">Full screen</button></div><div id="bview" class="bgrid"></div><p class="muted" id="bstamp" style="margin-top:10px;font-size:12px"></p></section>
+<section id="sec" hidden><div class="card" style="max-width:560px"><h2>Two-factor login</h2><div id="secbody"></div></div></section>
+<section id="mfa" hidden><div class="card" style="max-width:420px"><h2 id="mfah">Enter your code</h2><div id="mfabody"></div></div></section>
+
+<section id="pat" hidden>
+  <div class="card" style="max-width:520px"><h2>Check your status</h2>
+    <label style="margin-top:0">Bill no.</label><input id="pb" placeholder="BL-0012 or just 12" autocapitalize="characters" autocomplete="off"><label>Access code</label><input id="pc" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" placeholder="6 digits">
+    <button class="btn full" id="pgo">Open my status</button><div class="err" id="perr"></div></div>
+  <div id="pres"></div>
+  <details class="card" style="max-width:520px" id="ppriv"><summary style="cursor:pointer;font-weight:600">Privacy request (access, correction or deletion of my data)</summary>
+    <p class="muted" style="font-size:12px;margin-top:8px">The clinic will check your identity and answer within 30 days. <a href="../privacy.html" style="color:var(--g);font-weight:600">Read the privacy notice</a>.</p>
+    <label>Request</label><select id="prk"><option value="access">Give me a copy of my data</option><option value="correction">Correct my data</option><option value="erasure">Delete my data</option><option value="withdraw_consent">Withdraw my consent</option><option value="question">I have a question</option></select>
+    <label>Your name</label><input id="prn" maxlength="80"><label>Phone</label><input id="prp" inputmode="tel" maxlength="20"><label>Bill no. (optional)</label><input id="prb" maxlength="30">
+    <label>Details</label><input id="prd" maxlength="500"><button class="btn full" id="prgo">Send request</button><div class="err" id="prerr"></div><div class="note" id="prok" hidden>Request received. The clinic will contact you.</div></details></section>
+
+<section id="book" hidden><div class="card" style="max-width:520px"><h2>Request an appointment</h2>
+  <label style="margin-top:0">Your name</label><input id="bn"><label>Phone</label><input id="bp" inputmode="tel">
+  <label>Doctor</label><select id="bdoc"></select><label>Preferred date</label><input id="bdt" type="date">
+  <label>Reason</label><input id="br">
+  <label class="chk" style="margin-top:12px"><input type="checkbox" id="bcons"> I agree to the clinic storing my details to arrange this visit (<a href="../privacy.html" style="color:var(--g);text-decoration:underline">privacy notice</a>)</label>
+  <label class="chk" style="margin-top:6px"><input type="checkbox" id="bsms"> Send me SMS updates about my visit (optional)</label>
+  <button class="btn full" id="bgo">Send request</button>
+  <div class="err" id="berr"></div><div class="note" id="bok" hidden>Request received. Reception will confirm by phone.</div></div></section>
+</main>
+<div id="printarea" aria-hidden="true"></div>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script src="../js/app/app.js"></script>
+<script src="../js/app/print.js"></script>
+<script src="../js/app/security.js"></script>
+<script src="../js/app/admin.js"></script>
+<script src="../js/app/modules.js"></script>
+<script src="../js/app/patients.js"></script>
+<script src="../js/app/queue.js"></script>
+<script src="../js/app/slip.js"></script>
+<script src="../js/app/notes.js"></script>
+<script src="../js/app/notify.js"></script>
+<script src="../js/app/appointments.js"></script>
+<script src="../js/app/start.js"></script>
+</body></html>

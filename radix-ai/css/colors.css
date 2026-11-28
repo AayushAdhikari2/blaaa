@@ -1,0 +1,28 @@
+/* =====================================================================
+   COLOUR DATA — single source for the landing page AND the HMS app.
+   Both index.html (landing) and app/index.html load this file first.
+   Change a colour here and both update.
+   ===================================================================== */
+:root{
+  --g:#2ba67a;      /* brand green (buttons, active, highlights) */
+  --g2:#228a64;     /* brand green, hover */
+  --teal:#2f7f86;   /* secondary accent */
+  --ink:#0f1a17;    /* main text */
+  --mut:#5d6b66;    /* muted text */
+  --line:#e6ebe8;   /* borders */
+  --mint:#eaf7f1;   /* soft green panels / notes */
+  --bg:#fff;        /* page background */
+  /* status colours used by the HMS */
+  --blue:#4f6ef2;   /* report pending */
+  --grey:#d6d9de;   /* completed */
+  --warn:#d98a1f;   /* amount due */
+  --bad:#d64545;    /* errors */
+  /* hero gradient glow */
+  --sky:#cfe6f3; --sky2:#d6f0e4;
+}
+
+/* ===== brand (used by the landing page AND the app) ===== */
+.logo{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:-.01em;white-space:nowrap}
+.logo .mark{flex:none;border-radius:9px}
+.logo .ai{color:var(--g)}
+.logo .wm{white-space:nowrap}

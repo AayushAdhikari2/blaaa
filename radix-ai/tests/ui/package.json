@@ -1,0 +1,1 @@
+{"name":"radix-ai-tests","private":true,"scripts":{"smoke":"node ui-smoke.js"},"devDependencies":{"jsdom":"^26.1.0","qrcode-generator":"^1.4.4"}}

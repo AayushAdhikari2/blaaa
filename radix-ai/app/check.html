@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RADIX AI setup check</title>
+<link rel="stylesheet" href="../css/colors.css"><link rel="stylesheet" href="../css/app.css"></head>
+<body><main class="wrap" style="max-width:640px">
+<div class="card"><h2>Setup check</h2><p class="muted">Open this page after you fill <b>config.js</b> and run the SQL. Optional: log in below to test a staff role.</p>
+<div id="res"></div>
+<label>Staff email (optional)</label><input id="e" type="email"><label>Password</label><input id="p" type="password">
+<button class="btn full" id="go">Run checks</button></div></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
+<script>
+const $=s=>document.querySelector(s);
+const line=(ok,t,hint)=>{const d=document.createElement('div');d.className='row';d.innerHTML='<span></span><span class="'+(ok?'paid':'due')+'"></span>';d.firstChild.textContent=t+(ok?'':' — '+hint);d.lastChild.textContent=ok?'✓ OK':'✗ Fix';$('#res').append(d);return ok};
+$('#go').onclick=async()=>{
+  $('#res').replaceChildren();
+  if(SUPABASE_URL.includes('YOUR-PROJECT')||SUPABASE_ANON_KEY.includes('YOUR-ANON')) return line(false,'config.js filled in','paste your Project URL and anon key');
+  line(true,'config.js filled in');
+  const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+  let r=await sb.from('doctors').select('id');
+  line(!r.error&&r.data.length>0,'Doctors table readable ('+(r.data?r.data.length:0)+' doctors)','run setup.sql in the SQL Editor');
+  r=await sb.rpc('patient_status',{p_bill:'BL-CHECK',p_code:'000000'});
+  line(!r.error,'Patient lookup function exists','run setup.sql (schema_v3 part)');
+  r=await sb.from('visits').select('id').limit(1);
+  line(!!r.error||(r.data&&r.data.length===0),'Visits are hidden from the public','RLS is off on visits — re-run setup.sql');
+  r=await sb.rpc('queue_board');
+  line(!r.error,'Queue board function (step 7)','run setup.sql (v7 part)');
+  r=await sb.rpc('request_appointment',{p_name:'x',p_phone:'1',p_doctor:'d1',p_date:null,p_reason:'',p_consent:false,p_sms:false});
+  line(!!r.error&&/consent/i.test(r.error.message),'Public booking requires consent (step 9)','run setup.sql (v9 part)');
+  for(const [t,c] of [['outbox','id'],['audit_log','seq'],['privacy_requests','id'],['feedback','id'],['claims','id'],['allergy_terms','term']]){
+    r=await sb.from(t).select(c).limit(1);
+    line(!r.error&&r.data.length===0,'Table "'+t+'" is hidden from the public','run setup.sql, or RLS is off on '+t);
+  }
+  r=await sb.rpc('report_summary',{p_from:'2026-01-01',p_to:'2026-01-02'});
+  line(!!r.error,'Reports refuse the public','run setup.sql (v8 part)');
+  r=await sb.rpc('pharmacy_queue');
+  line(!!r.error,'Pharmacy queue refuses the public','run setup.sql (v10 part)');
+  const e=$('#e').value.trim();
+  if(e){
+    const l=await sb.auth.signInWithPassword({email:e,password:$('#p').value});
+    if(!line(!l.error,'Staff login works',l.error&&l.error.message)) return;
+    const pr=await sb.from('profiles').select('full_name,role,doctor_id').eq('id',l.data.user.id).maybeSingle();
+    line(!!pr.data,'Role assigned'+(pr.data?': '+pr.data.role:''),'run staff-setup.sql with this email');
+    const v=await sb.from('visits').select('id',{count:'exact',head:true});
+    line(!v.error,'Staff can read visits','role missing or policies not applied');
+    const st=await sb.from('settings').select('key').limit(1); line(!st.error&&st.data.length>0,'Staff can read clinic settings','run setup.sql (v6 part)');
+    if(pr.data&&pr.data.role==='admin'){ const av=await sb.rpc('audit_verify'); line(!av.error&&av.data&&av.data.ok,'Audit log chain is intact'+(av.data?' ('+av.data.checked+' lines)':''),av.error?av.error.message:'history was changed'); }
+    await sb.auth.signOut();
+  }
+};
+</script></body></html>

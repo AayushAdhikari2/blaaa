@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RADIX AI — Clinic management that keeps patients informed</title>
+<meta name="description" content="Queue, reports, pharmacy safety checks, wards and claims in one secure clinic system. Patients book online and follow their place in the queue from their phone.">
+<meta name="theme-color" content="#2ba67a">
+<link rel="icon" href="assets/icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/colors.css">
+<link rel="stylesheet" href="css/landing.css">
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap nav-in">
+    <a href="#top" class="logo" aria-label="RADIX AI home"><svg class="mark" width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2ba67a"/><stop offset="1" stop-color="#2f7f86"/></linearGradient></defs><rect width="32" height="32" rx="9" fill="url(#rg)"/><path d="M10 23V9h6.2a4.3 4.3 0 0 1 0 8.6H10M16 17.6 22 23" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="wm">RADIX <span class="ai">AI</span></span></a>
+    <nav class="links" id="links" aria-label="Main">
+      <a href="#how">How it works</a><a href="#features">Features</a><a href="#roles">Who uses it</a><a href="#trust">Privacy</a><a href="#faq">FAQ</a><a href="#contact">Contact</a>
+    </nav>
+    <div class="nav-cta">
+      <a href="app/#staff" class="login">Staff login</a>
+      <a href="app/#book" class="btn">Book appointment</a>
+      <button class="burger" id="burger" aria-label="Menu" aria-expanded="false" aria-controls="links"><span></span><span></span><span></span></button>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+
+<!-- ================= HERO ================= -->
+<section class="hero">
+  <div class="wrap hero-in">
+    <div class="hero-copy">
+      <span class="pill"><b class="tag">PILOT</b> Built for small and mid-size clinics</span>
+      <h1>Patients know where they stand.<br><span class="grad">Staff know what’s next.</span></h1>
+      <p class="sub">RADIX AI runs the whole clinic visit: registration, queue, doctor, lab reports, pharmacy and billing. Patients follow their turn from their own phone, so the waiting room stays calm.</p>
+      <div class="cta-row">
+        <a href="app/#book" class="btn lg">Book an appointment</a>
+        <a href="#status" class="btn lg ghost">Check my status</a>
+      </div>
+      <ul class="facts">
+        <li><b>1 screen</b><span>per role</span></li>
+        <li><b>SMS</b><span>only with consent</span></li>
+        <li><b>Audit log</b><span>on every change</span></li>
+      </ul>
+    </div>
+
+    <div class="hero-vis" aria-label="Example of the patient status page and the waiting-room queue board (sample data)">
+      <div class="phone">
+        <div class="ph-bar"><span></span></div>
+        <small class="ph-k">Your status</small>
+        <div class="ph-big"><b>#2</b><span>You are in the queue<br><em>about 16 min</em></span></div>
+        <div class="steps"><i class="done">Registered</i><i class="now">Waiting</i><i>Doctor</i><i>Report</i><i>Done</i></div>
+        <div class="ph-row"><span>Dr. Sharma · General Medicine</span><b class="paid">Token T-07</b></div>
+        <div class="ph-row"><span>Bill BL-0012</span><b class="due">Rs 500 due</b></div>
+      </div>
+      <div class="board">
+        <div class="bd-h"><b>Queue board</b><span>Sample</span></div>
+        <div class="bd-r"><div><small>Dr. Sharma</small><b class="srv">Now serving T-06</b></div><div class="tk"><i>T-07</i><i>T-08</i><i>T-09</i></div></div>
+        <div class="bd-r"><div><small>Dr. Thapa</small><b class="srv">Now serving T-03</b></div><div class="tk"><i>T-04</i><i>T-05</i></div></div>
+        <p class="bd-n">Tokens only. No names or phone numbers on the public screen.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= QUICK ACTIONS ================= -->
+<section class="wrap quick" aria-label="Quick actions">
+  <a class="qa" href="app/#book"><span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span><b>Book online</b><small>Request a visit with your doctor</small></a>
+  <a class="qa" href="#status"><span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><b>Check my status</b><small>Queue place, report and bill</small></a>
+  <a class="qa" href="app/#board"><span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg></span><b>Queue board</b><small>For the waiting-room screen</small></a>
+  <a class="qa" href="app/#staff"><span class="ic"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span><b>Staff login</b><small>Reception, doctors, lab, pharmacy</small></a>
+</section>
+
+<!-- ================= HOW IT WORKS ================= -->
+<section class="sec" id="how">
+  <div class="wrap">
+    <div class="head"><span class="pill">How it works</span><h2>One visit, from the door to the bill.</h2><p>Every step is recorded once and shown to the people who need it, nothing is typed twice.</p></div>
+    <ol class="flow4">
+      <li><span class="n">1</span><h3>Register</h3><p>Reception creates the visit and prints a slip with a token and a QR code. The patient can also book online first.</p></li>
+      <li><span class="n">2</span><h3>Wait with information</h3><p>The patient sees their place and an estimated time on their phone. Optional SMS tells them when they are called.</p></li>
+      <li><span class="n">3</span><h3>See the doctor</h3><p>The doctor records the visit, orders tests and prescribes. Allergy and interaction checks run before anything is sent.</p></li>
+      <li><span class="n">4</span><h3>Reports, medicines, bill</h3><p>Lab uploads the report, pharmacy dispenses from the batch that expires first, and charges land on one bill.</p></li>
+    </ol>
+  </div>
+</section>
+
+<!-- ================= FEATURES ================= -->
+<section class="sec alt" id="features">
+  <div class="wrap">
+    <div class="head"><span class="pill">What’s inside</span><h2>The tools a clinic needs every day.</h2><p>Eight modules that share one patient visit, built and tested together.</p></div>
+    <div class="grid4">
+      <article class="fcard"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg></span><h3>Queue &amp; tokens</h3><p>Per-doctor token numbers that never repeat, waiting-time estimates and a public board.</p></article>
+      <article class="fcard"><span class="ic"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/></svg></span><h3>Consent-based messages</h3><p>SMS when registered, called, or when the report is ready. Patients can stop messages at any time.</p></article>
+      <article class="fcard"><span class="ic"><svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5ZM14 3v5h5M9 13h6M9 17h6"/></svg></span><h3>Lab reports</h3><p>Upload a report to the visit, track turnaround time and let the patient open it with a private link.</p></article>
+      <article class="fcard"><span class="ic"><svg viewBox="0 0 24 24"><path d="M10.5 3.5a4.2 4.2 0 0 1 6 6l-7 7a4.2 4.2 0 0 1-6-6l7-7ZM8 8l6 6"/></svg></span><h3>Pharmacy safety</h3><p>Allergy and drug-interaction checks, including earlier prescriptions, first-expiry-first-out stock and automatic billing.</p></article>
+      <article class="fcard"><span class="ic"><svg viewBox="0 0 24 24"><path d="M3 18v-7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v7M3 18h18M3 21v-3M21 21v-3M6 9V6a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v3"/></svg></span><h3>Wards &amp; beds</h3><p>Admit, transfer and discharge with a live bed board and bed charges added to the bill.</p></article>
+      <article class="fcard"><span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/></svg></span><h3>Billing &amp; claims</h3><p>Itemised bills with QR, and insurance claims that must move through the steps in order.</p></article>
+      <article class="fcard"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span><h3>Dashboard</h3><p>Visits, average wait, consultation time, report turnaround, revenue and unpaid amounts, with CSV export.</p></article>
+      <article class="fcard"><span class="ic"><svg viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5 3.4 9 8 11 4.6-2 8-6 8-11V5l-8-3ZM8.5 12l2.5 2.5 4.5-5"/></svg></span><h3>Security built in</h3><p>Role-based access, two-factor login, automatic logout and a tamper-evident audit log.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ================= ROLES ================= -->
+<section class="sec" id="roles">
+  <div class="wrap">
+    <div class="head"><span class="pill">Who uses it</span><h2>A simple screen for every role.</h2><p>On a phone you get a bottom tab bar, on a computer a sidebar. Each person sees only what their job needs.</p></div>
+    <div class="roles">
+      <div class="role"><b>Reception</b><p>Register patients, print slips and bills, manage wards and claims.</p></div>
+      <div class="role"><b>Doctor</b><p>See your queue, write notes, prescribe safely, view earlier visits.</p></div>
+      <div class="role"><b>Lab</b><p>Upload reports and mark them ready for review.</p></div>
+      <div class="role"><b>Pharmacy</b><p>Dispense, manage stock and expiry, import medicine lists.</p></div>
+      <div class="role"><b>Admin</b><p>Team, reports, messages, privacy requests, audit log and settings.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= TRUST ================= -->
+<section class="sec alt" id="trust">
+  <div class="wrap">
+    <div class="head"><span class="pill">Privacy &amp; safety</span><h2>Careful with patient data.</h2><p>Practical safeguards you can see and test, not badges.</p></div>
+    <div class="grid2">
+      <div class="card big"><h3>Tamper-evident audit log</h3><p>Every change is written to an append-only log chained with hashes. Personal details are masked in the log, and an admin can verify the chain at any time.</p>
+        <div class="chain" aria-hidden="true"><span>#101</span><i></i><span>#102</span><i></i><span>#103</span><i></i><span class="ok">✓ verified</span></div></div>
+      <div class="card big"><h3>Consent first</h3><p>SMS is sent only when the patient agreed. Patients can ask for their data to be corrected or erased, and old visits can be anonymised after your legal retention period.</p>
+        <div class="chain" aria-hidden="true"><span>Consent</span><i></i><span>Message</span><i></i><span class="ok">Stop any time</span></div></div>
+      <div class="card big"><h3>Locked-down access</h3><p>Staff roles are enforced in the database itself. Two-factor login can be required for everyone, and idle sessions log out after 15 minutes.</p>
+        <div class="chain" aria-hidden="true"><span>Login</span><i></i><span>2FA</span><i></i><span class="ok">Role check</span></div></div>
+      <div class="card big"><h3>Backups you can restore</h3><p>Encrypted nightly backups and a documented restore drill, so a bad day does not become a lost record.</p>
+        <div class="chain" aria-hidden="true"><span>Nightly</span><i></i><span>Encrypted</span><i></i><span class="ok">Restore tested</span></div></div>
+    </div>
+    <p class="center muted small">Read the full <a class="lnk" href="privacy.html">privacy notice</a>.</p>
+  </div>
+</section>
+
+<!-- ================= PATIENT STATUS ================= -->
+<section class="sec" id="status">
+  <div class="wrap status-in">
+    <div class="head left"><span class="pill">For patients</span><h2>Check your queue and report status.</h2><p>Enter the bill number and access code printed on your slip, or scan the QR code on it.</p>
+      <p class="muted small">Keep your slip private: anyone holding it can see your status.</p></div>
+    <form class="card form" id="statusform">
+      <label>Bill number<input id="sb" required autocomplete="off" autocapitalize="characters" enterkeyhint="next" placeholder="BL-0012 or just 12"><small class="muted">Short number printed on your slip. Digits alone are fine.</small></label>
+      <label>Access code<input id="sc" required inputmode="numeric" maxlength="6" autocomplete="off" placeholder="6 digits"></label>
+      <button class="btn full lg" type="submit">Open my status</button>
+      <p class="links2"><a href="app/#book">Book online</a><a href="app/#board">Queue board</a><a href="privacy.html">Privacy</a></p>
+    </form>
+  </div>
+</section>
+
+<!-- ================= FAQ ================= -->
+<section class="sec alt" id="faq">
+  <div class="wrap faq">
+    <div>
+      <h2>Frequently asked questions</h2><p class="muted">Straight answers about what RADIX AI does today.</p>
+      <div class="card ask"><h3>Still have questions?</h3><p>Write to us and we will reply within one working day.</p><a class="btn" href="#contact">Contact us</a></div>
+    </div>
+    <div class="acc">
+      <details><summary>Is it ready for real patients?</summary><p>It is in a pilot stage. We recommend a two-week pilot with paper kept as backup, and a legal review of the privacy notice and record-retention period before you go live.</p></details>
+      <details><summary>Do patients have to install an app?</summary><p>No. The patient page works in any phone browser, and staff can add RADIX AI to the home screen like an app.</p></details>
+      <details><summary>How do SMS messages work?</summary><p>Messages go out only when the patient consented at registration or booking. They cover registration, being called, “N patients ahead” and report ready. A patient can opt out at any time.</p></details>
+      <details><summary>Does it work without internet?</summary><p>No. A banner tells staff when the connection drops, but registering and saving need internet.</p></details>
+      <details><summary>Which languages and time zone?</summary><p>The interface is in English, and times use Asia/Kathmandu.</p></details>
+      <details><summary>Are the medicine and interaction lists final?</summary><p>No. The starting lists are samples. A pharmacist must review or replace them before real use, and admins can edit allergy terms in the app.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CONTACT ================= -->
+<section class="sec" id="contact">
+  <div class="wrap">
+    <div class="head"><span class="pill">Contact</span><h2>Talk to the RADIX AI team.</h2><p>Tell us about your clinic and we will get back to you within one working day.</p></div>
+    <div class="cinfo">
+      <div class="card"><h3>Visit us</h3><p>Our office</p><b>[Your address, city]</b></div>
+      <div class="card"><h3>Call us</h3><p>Sun to Fri, 9am to 5pm</p><b>[+977 …]</b></div>
+      <div class="card"><h3>Email</h3><p>We read every message</p><a class="mail-link" id="mailto" href="mailto:support@radix-ai.example">support@radix-ai.example</a></div>
+    </div>
+    <form class="card form wide" id="form">
+      <div class="two"><label>Your name<input name="name" required placeholder="Full name"></label><label>Clinic or organisation<input name="org" placeholder="Optional"></label></div>
+      <label>Message<textarea name="msg" rows="4" required placeholder="How can we help?"></textarea></label>
+      <button class="btn lg" type="submit">Write us an email</button>
+      <p class="muted small">This opens your email app with the message filled in. Please do not include patient details.</p>
+    </form>
+  </div>
+</section>
+
+<!-- ================= CTA ================= -->
+<section class="wrap">
+  <div class="cta">
+    <div><h2>Make waiting rooms calmer.</h2><p>Book a visit, or sign in to start running your clinic on RADIX AI.</p></div>
+    <div class="cta-b"><a href="app/#book" class="btn lg light">Book appointment</a><a href="app/#staff" class="btn lg outline">Staff login</a></div>
+  </div>
+</section>
+</main>
+
+<footer class="foot">
+  <div class="wrap fgrid">
+    <div><a href="#top" class="logo"><span class="wm">RADIX <span class="ai">AI</span></span></a><p>Clinic management for patients and staff.</p></div>
+    <div><h4>Patients</h4><a href="app/#book">Book appointment</a><a href="#status">Check my status</a><a href="app/#board">Queue board</a></div>
+    <div><h4>Product</h4><a href="#how">How it works</a><a href="#features">Features</a><a href="#faq">FAQ</a><a href="xray/">AI X-ray check</a></div>
+    <div><h4>Legal</h4><a href="privacy.html">Privacy notice</a><a href="app/#staff">Staff login</a></div>
+  </div>
+  <p class="wrap copy">© 2026 RADIX AI. All rights reserved. Sample data is shown on this page for illustration.</p>
+</footer>
+<script src="js/landing.js"></script>
+</body>
+</html>
