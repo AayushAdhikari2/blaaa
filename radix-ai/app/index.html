@@ -3,7 +3,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#2ba67a">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="../assets/icons/icon-192.png">
+<link rel="icon" href="../assets/favicon.png">
 <link rel="apple-touch-icon" href="../assets/icons/icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="RADIX AI">
 <title>RADIX AI</title>
@@ -12,9 +12,11 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/colors.css">
 <link rel="stylesheet" href="../css/app.css">
+<link rel="stylesheet" href="../css/ui.css">
+<link rel="stylesheet" href="../css/xray.css">
 </head><body>
 <header class="nav"><div class="wrap nav-in">
-  <a href="../" class="logo"><svg class="mark" width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2ba67a"/><stop offset="1" stop-color="#2f7f86"/></linearGradient></defs><rect width="32" height="32" rx="9" fill="url(#rg)"/><path d="M10 23V9h6.2a4.3 4.3 0 0 1 0 8.6H10M16 17.6 22 23" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="wm">RADIX <span class="ai">AI</span></span></a>
+  <a href="../" class="logo"><img class="mark" src="../assets/logo.png" width="34" height="34" alt=""><span class="wm">RADIX <span class="ai">AI</span></span></a>
   <div class="nav-cta"><span class="who" id="who"></span><button class="btn ghost sm" id="out" hidden>Log out</button></div>
 </div></header>
 <nav id="nav" class="tabbar" aria-label="Main navigation"></nav>
@@ -25,23 +27,23 @@
   <h1 id="h1">Know exactly where you are in the queue.</h1><p class="sub" id="sub">Enter your bill number and code to see your waiting number, report status and bill.</p></div></section>
 <main class="wrap">
 <section id="login" hidden><div class="card" style="max-width:380px"><h2>Staff login</h2>
-  <label>Email</label><input id="le" type="email" autocomplete="username" inputmode="email" autocapitalize="off"><label>Password</label><input id="lp" type="password" autocomplete="current-password">
+  <label for="le">Email</label><input id="le" type="email" autocomplete="username" inputmode="email" autocapitalize="off"><label for="lp">Password</label><input id="lp" type="password" autocomplete="current-password">
   <button class="btn full" id="lgo">Log in</button><div class="err" id="lerr"></div></div></section>
 
 <section id="rec" hidden><div class="grid">
   <div><div class="card"><h2>New registration</h2>
-    <label>Patient name</label><input id="rn"><label>Phone</label><input id="rp" inputmode="tel">
-    <label>Age</label><input id="ra" type="number" min="0" max="120"><label>Doctor</label><select id="rd"></select>
+    <label for="rn">Patient name</label><input id="rn"><label for="rp">Phone</label><input id="rp" inputmode="tel">
+    <label for="ra">Age</label><input id="ra" type="number" min="0" max="120"><label for="rd">Doctor</label><select id="rd"></select>
     <div id="rdup" class="note" hidden></div>
-    <label>Reason for visit</label><input id="rr">
-    <label>Allergies (comma separated, or leave empty)</label><input id="ral" placeholder="e.g. penicillin, dust" maxlength="300">
+    <label for="rr">Reason for visit</label><input id="rr">
+    <label for="ral">Allergies (comma separated, or leave empty)</label><input id="ral" placeholder="e.g. penicillin, dust" maxlength="300">
     <label class="chk" style="margin-top:12px"><input type="checkbox" id="rsms"> Patient agrees to SMS updates (queue and report messages)</label>
     <label class="chk" style="margin-top:6px"><input type="checkbox" id="rcons"> Privacy notice explained to the patient</label>
     <button class="btn full" id="rgo">Register &amp; generate bill</button><div class="err" id="rerr"></div>
     <div class="slip" id="slip" hidden></div></div>
     <div class="card"><h2>Online appointment requests</h2><div id="reqs"></div></div></div>
   <div><div class="card"><h2>Today’s visits</h2><div id="rlist"></div></div>
-    <div class="card"><h2>Billing</h2><label>Visit</label><select id="bsel"></select>
+    <div class="card"><h2>Billing</h2><label for="bsel">Visit</label><select id="bsel"></select>
       <div id="bitems"></div>
       <div class="inl"><input id="bd" placeholder="Charge (e.g. Consultation)"><input id="ba" type="number" min="0" step="0.01" placeholder="Amount (Rs)" style="max-width:150px"><button class="btn sm" id="badd">Add</button></div>
       <div class="inl"><button class="btn ghost sm" id="bpaid">Mark paid</button><button class="btn ghost sm" id="bprint">Print bill</button></div></div></div>
@@ -67,7 +69,7 @@
 </div></div>
 <div id="adm-other" class="pane"></div></section>
 
-<section id="doc" hidden><div class="card" id="dpick"><label style="margin-top:0">Doctor</label><select id="dsel"></select></div><div id="dview"></div></section>
+<section id="doc" hidden><div class="card" id="dpick"><label for="dsel" style="margin-top:0">Doctor</label><select id="dsel"></select></div><div id="dview"></div></section>
 <section id="lab" hidden><div class="card"><h2>Reports to prepare</h2><div id="lview"></div></div></section>
 
 
@@ -80,28 +82,86 @@
 
 <section id="pat" hidden>
   <div class="card" style="max-width:520px"><h2>Check your status</h2>
-    <label style="margin-top:0">Bill no.</label><input id="pb" placeholder="BL-0012 or just 12" autocapitalize="characters" autocomplete="off"><label>Access code</label><input id="pc" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" placeholder="6 digits">
+    <label for="pb" style="margin-top:0">Bill no.</label><input id="pb" placeholder="BL-0012 or just 12" autocapitalize="characters" autocomplete="off"><label for="pc">Access code</label><input id="pc" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" placeholder="6 digits">
     <button class="btn full" id="pgo">Open my status</button><div class="err" id="perr"></div></div>
   <div id="pres"></div>
   <details class="card" style="max-width:520px" id="ppriv"><summary style="cursor:pointer;font-weight:600">Privacy request (access, correction or deletion of my data)</summary>
     <p class="muted" style="font-size:12px;margin-top:8px">The clinic will check your identity and answer within 30 days. <a href="../privacy.html" style="color:var(--g);font-weight:600">Read the privacy notice</a>.</p>
-    <label>Request</label><select id="prk"><option value="access">Give me a copy of my data</option><option value="correction">Correct my data</option><option value="erasure">Delete my data</option><option value="withdraw_consent">Withdraw my consent</option><option value="question">I have a question</option></select>
-    <label>Your name</label><input id="prn" maxlength="80"><label>Phone</label><input id="prp" inputmode="tel" maxlength="20"><label>Bill no. (optional)</label><input id="prb" maxlength="30">
-    <label>Details</label><input id="prd" maxlength="500"><button class="btn full" id="prgo">Send request</button><div class="err" id="prerr"></div><div class="note" id="prok" hidden>Request received. The clinic will contact you.</div></details></section>
+    <label for="prk">Request</label><select id="prk"><option value="access">Give me a copy of my data</option><option value="correction">Correct my data</option><option value="erasure">Delete my data</option><option value="withdraw_consent">Withdraw my consent</option><option value="question">I have a question</option></select>
+    <label for="prn">Your name</label><input id="prn" maxlength="80"><label for="prp">Phone</label><input id="prp" inputmode="tel" maxlength="20"><label for="prb">Bill no. (optional)</label><input id="prb" maxlength="30">
+    <label for="prd">Details</label><input id="prd" maxlength="500"><button class="btn full" id="prgo">Send request</button><div class="err" id="prerr"></div><div class="note" id="prok" hidden>Request received. The clinic will contact you.</div></details></section>
+
+<section id="xray" class="xs" hidden>
+  <div id="x-demo" class="demo" hidden><b>DEMO MODE.</b> Nothing is sent to an AI and your image is not analysed. All report text is a fixed sample.</div>
+  <p class="muted" style="max-width:640px">AI prepares a draft report. A doctor checks it before you can read it. Your X-ray image is not saved by this system.</p>
+  <div class="warn"><b>This is not an emergency service.</b> If you have trouble breathing, chest pain, heavy bleeding, a head injury, a badly bent or numb limb, or severe pain, get medical care now. Do not wait for this report.</div>
+  <nav class="subtabs" aria-label="X-ray pages"><button id="x-t-scan" class="on" type="button">New scan</button><button id="x-t-report" type="button">My report</button></nav>
+
+  <section id="x-p-scan">
+    <form id="x-form" class="card" autocomplete="off" novalidate>
+      <div class="two">
+        <div><label for="x-name">Patient name</label><input id="x-name" maxlength="80" required></div>
+        <div><label for="x-phone">Phone</label><input id="x-phone" inputmode="tel" maxlength="20" required></div>
+        <div><label for="x-age">Age</label><input id="x-age" type="number" min="0" max="120" required></div>
+        <div><label for="x-sex">Sex</label><select id="x-sex" required><option value="">Choose…</option><option value="female">Female</option><option value="male">Male</option><option value="other">Other</option></select></div>
+        <div><label for="x-part">Body part</label><select id="x-part" required></select></div>
+        <div><label for="x-side">Side</label><select id="x-side" required><option value="">Choose…</option><option value="left">Left</option><option value="right">Right</option><option value="both">Both</option><option value="na">Not applicable</option></select></div>
+      </div>
+      <label for="x-symptoms">What is the problem? (optional)</label><textarea id="x-symptoms" maxlength="500" rows="3" placeholder="e.g. fell on my hand two days ago, swelling at the wrist"></textarea>
+      <label for="x-file">X-ray image (JPG, PNG or WebP)</label><input id="x-file" type="file" accept="image/jpeg,image/png,image/webp" required>
+      <p class="hint">Best: the digital X-ray file. For a printed film: hold it against an even light, take a straight photo of the whole film, with no glare. Crop or cover any printed name or ID. CT, MRI, ultrasound and DICOM files are not supported.</p>
+      <label class="chk"><input id="x-consent" type="checkbox"><span>I agree that my X-ray image, age, sex, body part and symptoms are sent to an AI service (Anthropic) to prepare a draft. This system does not save the image. The AI provider may keep it for a limited time (normally deleted within 30 days; longer if flagged for a policy or legal reason). My name, phone, details and report text are saved for the clinic and a doctor. Text I type, or that is printed on the image, may be sent too. If the patient is under 18, I am the parent or guardian.</span></label>
+      <button id="x-go" class="btn full" type="submit">Scan my X-ray</button>
+      <p id="x-ferr" class="err" role="alert"></p>
+    </form>
+
+    <div id="x-scan" class="card" hidden>
+      <h2>Scanning…</h2>
+      <div class="stage"><canvas id="x-canvas" aria-label="The X-ray being scanned"></canvas><div class="beam"></div></div>
+      <p id="x-sstat" role="status" class="muted"></p>
+      <p class="hint">The image is on this page only while it is being scanned. Keep this page open.</p>
+    </div>
+
+    <div id="x-done" class="card" hidden>
+      <h2>Scan finished. A doctor will now review it.</h2>
+      <p class="ok">The image has been cleared from this page and was not saved by this system. Keep your original X-ray: the doctor needs to see it.</p>
+      <div class="slip"><div><small>Report number</small><b id="x-dref"></b></div><div><small>Access code</small><b id="x-dcode"></b></div></div>
+      <p><b>Write these down or take a screenshot now.</b> The code is shown only once.</p>
+      <button id="x-again" class="btn ghost" type="button">Scan another X-ray</button>
+    </div>
+  </section>
+
+  <section id="x-p-report" hidden>
+    <form id="x-lform" class="card narrow" autocomplete="off">
+      <label for="x-lref">Report number</label><input id="x-lref" placeholder="XR-1A2B3C4D" autocapitalize="characters" maxlength="14">
+      <label for="x-lcode">Access code</label><input id="x-lcode" inputmode="numeric" maxlength="8" placeholder="8 digits">
+      <button class="btn full" type="submit">Open my report</button>
+      <p id="x-lerr" class="err" role="alert"></p>
+    </form>
+    <div id="x-result"></div>
+  </section>
+</section>
+<section id="xrv" class="xs" hidden>
+  <div id="x-note" class="card" hidden></div>
+  <div id="x-list" hidden><nav class="subtabs" id="x-qtabs" aria-label="Report status"></nav><div class="card" id="x-queue"></div></div>
+  <div id="x-detail" hidden></div>
+</section>
 
 <section id="book" hidden><div class="card" style="max-width:520px"><h2>Request an appointment</h2>
-  <label style="margin-top:0">Your name</label><input id="bn"><label>Phone</label><input id="bp" inputmode="tel">
-  <label>Doctor</label><select id="bdoc"></select><label>Preferred date</label><input id="bdt" type="date">
-  <label>Reason</label><input id="br">
-  <label class="chk" style="margin-top:12px"><input type="checkbox" id="bcons"> I agree to the clinic storing my details to arrange this visit (<a href="../privacy.html" style="color:var(--g);text-decoration:underline">privacy notice</a>)</label>
+  <label for="bn" style="margin-top:0">Your name</label><input id="bn"><label for="bp">Phone</label><input id="bp" inputmode="tel">
+  <label for="bdoc">Doctor</label><select id="bdoc"></select><label for="bdt">Preferred date</label><input id="bdt" type="date">
+  <label for="br">Reason</label><input id="br">
+  <label id="btermslab" style="margin-top:14px">Terms and conditions</label>
+  <div id="bterms" class="termsbox" tabindex="0" role="region" aria-labelledby="btermslab"><p class="muted">Loading…</p></div>
+  <label class="chk" style="margin-top:12px"><input type="checkbox" id="bcons"> I have read and agree to the terms and conditions above, and I agree to the clinic storing my details to arrange this visit (<a href="../privacy.html" style="color:var(--g-text);text-decoration:underline">privacy notice</a>)</label>
   <label class="chk" style="margin-top:6px"><input type="checkbox" id="bsms"> Send me SMS updates about my visit (optional)</label>
   <button class="btn full" id="bgo">Send request</button>
   <div class="err" id="berr"></div><div class="note" id="bok" hidden>Request received. Reception will confirm by phone.</div></div></section>
 </main>
 <div id="printarea" aria-hidden="true"></div>
-<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="../js/config.js"></script>
+<script src="../js/app/ui.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
 <script src="../js/app/app.js"></script>
 <script src="../js/app/print.js"></script>
@@ -113,6 +173,8 @@
 <script src="../js/app/slip.js"></script>
 <script src="../js/app/notes.js"></script>
 <script src="../js/app/notify.js"></script>
+<script src="../js/app/inbox.js"></script>
 <script src="../js/app/appointments.js"></script>
+<script src="../js/app/xray.js"></script>
 <script src="../js/app/start.js"></script>
 </body></html>

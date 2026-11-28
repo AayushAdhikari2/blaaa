@@ -33,7 +33,7 @@ const empty = t => [h('p',{class:'muted empty'},t)];
 const st = s => h('span',{class:'st '+s}, LBL[s]);
 
 const HASH = location.hash.slice(1);
-let SET = {}, DOCS = [], session = null, me = null, view = ['pat','book','staff','board'].includes(HASH) ? HASH : 'pat', cur = null, apptId = null, VT = [];
+let SET = {}, DOCS = [], session = null, me = null, view = ['pat','book','staff','board','xray'].includes(HASH) ? HASH : 'pat', cur = null, apptId = null, VT = [];
 const can = r => me && (me.role === 'admin' || me.role === r);
 const QP = new URLSearchParams(location.search); let AUTO = false;
 if (QP.get('b') && QP.get('c')) {
@@ -55,7 +55,9 @@ const TITLES = {pat:['Patient status','Know exactly where you are in the queue.'
   wrd:['Wards','Beds and admissions.','Admit, transfer and discharge patients. Bed charges go to the bill.'],
   clm:['Claims','Insurance claims.','Track each claim from draft to paid.'],
   adm:['Admin','Manage your clinic.','Team, settings, reports, messages, privacy and audit log.'],
-  sec:['Security','Your login security.','Protect your account with an authenticator app.']};
+  sec:['Security','Your login security.','Protect your account with an authenticator app.'],
+  xray:['AI X-ray','Upload an X-ray for an AI draft report.','A doctor checks every report before you can read it. This is not an emergency service.'],
+  xrv:['X-ray review','Check AI X-ray drafts.','Look at the original X-ray, correct the draft, then approve it under your name.']};
 // every screen is listed here once: [id, label, who can see it]
 // line icons (24x24, stroke). Constant markup only, never user data.
 const ICONS = {
@@ -72,8 +74,10 @@ const ICONS = {
   staff:'<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
   sec:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="m9 12 2 2 4-4"/>',
   more:'<circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/>',
+  xray:'<path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M8 12h8M12 8v8"/>',
+  xrv:'<path d="M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/>',
   fb:'<path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.7A8.4 8.4 0 1 1 21 11.5z"/>'};
-const SHORT = {adm:'Admin',rec:'Reception',doc:'Doctor',lab:'Lab',pha:'Pharmacy',wrd:'Wards',clm:'Claims',board:'Board',pat:'Status',book:'Book',staff:'Staff',sec:'Security'};
+const SHORT = {adm:'Admin',rec:'Reception',doc:'Doctor',lab:'Lab',pha:'Pharmacy',wrd:'Wards',clm:'Claims',board:'Board',pat:'Status',book:'Book',staff:'Staff',sec:'Security',xray:'X-ray',xrv:'Review'};
 const icon = k => { const e = document.createElement('span'); e.className = 'ico'; e.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + (ICONS[k] || ICONS.more) + '</svg>'; return e; };
 const isPhone = () => !!(window.matchMedia && window.matchMedia('(max-width: 899px)').matches);
 function closeSheet(){ $('#sheet').hidden = true; $('#sheetbg').hidden = true; }
@@ -101,12 +105,13 @@ const TABDEF = [
   ['adm','Admin', () => me.role==='admin'], ['rec','Reception', () => can('reception')], ['doc','Doctor', () => can('doctor')],
   ['lab','Lab', () => can('lab')], ['pha','Pharmacy', () => can('pharmacy')],
   ['wrd','Wards', () => ['reception','doctor','admin'].includes(me.role)], ['clm','Claims', () => ['reception','admin'].includes(me.role)],
-  ['board','Queue board', () => true], ['pat','Patient Portal', () => true], ['sec','Security', () => true]];
+  ['xrv','X-ray review', () => ['doctor','admin'].includes(me.role)],
+  ['board','Queue board', () => true], ['pat','Patient Portal', () => true], ['xray','AI X-ray', () => true], ['sec','Security', () => true]];
 const RENDER = {adm:() => renderAdm(), rec:() => renderRec(), doc:() => renderDoc(), lab:() => renderLab(), pha:() => renderPha(),
-  wrd:() => renderWrd(), clm:() => renderClm(), board:() => renderBoard(), sec:() => renderSec(),
+  wrd:() => renderWrd(), clm:() => renderClm(), board:() => renderBoard(), sec:() => renderSec(), xray:() => renderXray(), xrv:() => renderXrv(), book:() => loadTerms(),
   pat:() => {const f=AUTO;AUTO=false;return renderPat(f)}};
 function tabs(){
-  if (!me) return [['pat','Patient Portal'],['book','Book Appointment'],['board','Queue board'],['staff','Staff login']];
+  if (!me) return [['pat','Patient Portal'],['book','Book Appointment'],['xray','AI X-ray'],['board','Queue board'],['staff','Staff login']];
   return TABDEF.filter(t => t[2]()).map(t => [t[0], t[1]]);
 }
 function go(v){
@@ -131,13 +136,24 @@ $('#lgo').onclick = async () => {
 };
 
 /* ---------- public: book appointment ---------- */
+// The booking terms and conditions are written by the clinic (Admin > Settings) and read from the database, so patients always see the current text.
+let TERMS_OK = false;
+async function loadTerms(){
+  const box = $('#bterms'); if (!box) return;
+  const {data, error} = await sb.rpc('public_terms');
+  const text = data && data.text && data.text.trim();
+  TERMS_OK = !error && !!text;
+  box.replaceChildren(...(TERMS_OK ? text.split(/\n\s*\n/).map(t => h('p', null, t.trim())) : [h('p', {class:'err'}, 'The terms and conditions could not be loaded. Check your connection and try again.')]));
+}
 $('#bgo').onclick = async () => {
-  if (!$('#bcons').checked) { $('#berr').textContent = 'Please tick the box to agree to the privacy notice.'; $('#bok').hidden = true; return; }
+  if (!TERMS_OK) { await loadTerms(); if (!TERMS_OK) { $('#berr').textContent = 'The terms and conditions could not be loaded, so the request cannot be sent. Try again.'; return; } }
+  if (!$('#bcons').checked) { $('#berr').textContent = 'Please read the terms and conditions and tick the box to agree.'; $('#bok').hidden = true; $('#bcons').focus(); return; }
   const {error} = await sb.rpc('request_appointment', {p_name:$('#bn').value, p_phone:$('#bp').value, p_doctor:$('#bdoc').value, p_date:$('#bdt').value || null, p_reason:$('#br').value, p_consent:true, p_sms:$('#bsms').checked});
   const m = error && error.message || '';
   $('#berr').textContent = !error ? '' : /too many/i.test(m) ? 'Too many requests from this number. Please call the clinic.' : /busy/i.test(m) ? 'The system is busy. Please try again later.' : 'Please enter your name and phone.';
   $('#bok').hidden = !!error;
-  if (!error) { ['#bn','#bp','#br','#bdt'].forEach(x => $(x).value = ''); $('#bcons').checked = false; $('#bsms').checked = false; }
+  if (!error) { ['#bn','#bp','#br','#bdt'].forEach(x => $(x).value = ''); $('#bcons').checked = false; $('#bsms').checked = false; UI.toast('Request sent. Reception will confirm by phone.', 'success'); }
+  else UI.toast($('#berr').textContent, 'error');
 };
 
 /* ---------- reception ---------- */
@@ -181,28 +197,34 @@ async function renderBill(){
   const items = (await sb.from('bill_items').select('*').eq('visit_id', v.id).order('id')).data || [];
   const tot = items.reduce((s,i) => s + Number(i.amount), 0);
   $('#bitems').replaceChildren(...items.map(i => h('div',{class:'row'},h('span',null,i.description),
-      h('span',null,rs(i.amount),' ',h('a',{class:'muted',href:'#',onclick:async e=>{e.preventDefault();await sb.from('bill_items').delete().eq('id',i.id);renderBill()}},'✕')))),
+      h('span',null,rs(i.amount),' ',h('a',{class:'muted',href:'#',role:'button','aria-label':'Remove charge '+i.description,title:'Remove this charge',onclick:async e=>{e.preventDefault();if(!await ask({title:'Remove this charge?',message:i.description+' · '+rs(i.amount)+' will be taken off the bill.',confirm:'Remove charge',danger:true}))return;const {error}=await sb.from('bill_items').delete().eq('id',i.id);if(error)toast('Could not remove the charge: '+error.message,true);else toast('Charge removed.');renderBill()}},'✕')))),
     h('div',{class:'row'},h('b',null,'Total'),h('b',null,rs(tot))));
   $('#bpaid').textContent = v.paid_at ? 'Mark as unpaid' : 'Mark paid';
 }
 $('#bsel').onchange = renderBill;
 $('#badd').onclick = async () => {
   const id = +$('#bsel').value, d = $('#bd').value.trim(), a = parseFloat($('#ba').value);
-  if (!id || !d || !(a >= 0)) return;
-  await sb.from('bill_items').insert({visit_id:id, description:d, amount:a});
+  if (!id || !d || !(a >= 0)) { UI.toast('Choose a visit and enter the charge name and amount.', 'warning'); return; }
+  const {error} = await sb.from('bill_items').insert({visit_id:id, description:d, amount:a});
+  if (error) { toast('Could not add the charge: ' + error.message, true); return; }
+  toast('Added ' + d + ' · ' + rs(a) + '.');
   $('#bd').value = ''; $('#ba').value = ''; renderBill();
 };
-$('#bpaid').onclick = async () => {
+$('#bpaid').onclick = async e => {
   const v = VT.find(x => String(x.id) === $('#bsel').value); if (!v) return;
-  await sb.from('visits').update({paid_at: v.paid_at ? null : new Date().toISOString()}).eq('id', v.id); renderRec();
+  const btn = e.currentTarget;
+  const items = (await sb.from('bill_items').select('amount').eq('visit_id', v.id)).data || [], tot = items.reduce((s,i) => s + Number(i.amount), 0);
+  const undo = !!v.paid_at;
+  if (!await ask({title: undo ? 'Mark this bill as unpaid?' : 'Record payment?', message: v.bill+' · '+tk(v.token)+' · total '+rs(tot)+(undo ? '. Use this only to correct a mistake. The change is recorded in the audit log.' : '. Confirm that the money has been received.'), confirm: undo ? 'Mark unpaid' : 'Payment received', danger: undo})) return;
+  await busy(btn, 'Saving…', async () => {
+    const {error} = await sb.from('visits').update({paid_at: undo ? null : new Date().toISOString()}).eq('id', v.id);
+    if (error) toast('Could not save the payment: ' + error.message, true); else toast(undo ? 'Marked as unpaid.' : 'Payment recorded for ' + v.bill + '.');
+    renderRec();
+  });
 };
 
-/* ---------- small UI helpers (toast, busy buttons, drafts) ---------- */
-let toastT;
-function toast(msg, bad){
-  const t = $('#toast'); t.textContent = msg; t.className = 'toast' + (bad ? ' bad' : ''); t.hidden = false;
-  clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, bad ? 6000 : 3500);
-}
+/* ---------- small UI helpers (busy buttons, drafts) ---------- */
+// toast() now lives in ui.js (one toast + dialog system for the whole app)
 async function busy(btn, label, fn){
   if (btn.disabled) return;
   const old = btn.textContent; btn.disabled = true; btn.textContent = label;
@@ -252,9 +274,10 @@ function roomRow(v){
       if (ok) { delete DRAFT[kt]; delete DRAFT[km]; toast('Sent to lab: '+name+' for '+v.name+'. Patient is notified on their status page.'); }
     });
   }},'Send to lab');
-  const done = h('button',{class:'btn ghost sm',onclick:e => {
-    if (!confirm('Complete the visit for '+v.name+'? They will be removed from your list.')) return;
-    return busy(e.target,'Saving…',async()=>{ if (await act(v.id,{status:'done'})) toast('Visit completed: '+v.name); });
+  const done = h('button',{class:'btn ghost sm',onclick:async e => {
+    const btn = e.target;
+    if (!await ask({title:'Complete this visit?', message:tk(v.token)+' · '+v.name+' will be removed from your list. Order a test first if one is still needed.', confirm:'Complete visit'})) return;
+    return busy(btn,'Saving…',async()=>{ if (await act(v.id,{status:'done'})) toast('Visit completed: '+v.name); });
   }},'Complete visit');
   return h('div',{class:'room'},
     h('div',{class:'row',style:'border:0;padding:0'},
@@ -303,9 +326,9 @@ function labRow(v){
       await finish(path);
     });
   }},'Upload & mark ready');
-  const nofile = h('a',{href:'#',class:'muted',style:'font-size:12px',onclick:e=>{
+  const nofile = h('a',{href:'#',class:'muted',style:'font-size:12px',onclick:async e=>{
     e.preventDefault();
-    if (confirm('Mark ready WITHOUT a file? The patient will see “Ready” but nothing to download.')) busy(go,'Saving…',()=>finish(null));
+    if (await ask({title:'Mark ready without a file?', message:'The patient will see “Ready” but there will be nothing to download.', confirm:'Mark ready', danger:true})) busy(go,'Saving…',()=>finish(null));
   }},'Mark ready without a file');
   return h('div',{class:'room'},
     h('div',{class:'row',style:'border:0;padding:0'},
@@ -343,13 +366,15 @@ async function renderTeam(){
     h('div',{class:'inl',style:'margin:0'},h('span',{class:'st'},u.role+(u.doctor_id?' · '+doc(u.doctor_id).name:'')),
       h('button',{class:'btn ghost sm',onclick:()=>{EDIT=u;fillStaffForm();scrollTo({top:0,behavior:'smooth'})}},'Edit'),
       h('button',{class:'btn ghost sm',title:'Use when someone lost their phone',onclick:async e=>{
-        if (!confirm('Remove the authenticator from '+u.full_name+'? They will set up a new one at next login.')) return;
-        await busy(e.target,'Resetting…',async()=>{ try { await callStaff({action:'reset_mfa',id:u.id}); toast('2FA reset for '+u.full_name); } catch(x){ toast(x.message,true); } });
+        const btn = e.target;
+        if (!await ask({title:'Reset two-factor login?', message:'Remove the authenticator from '+u.full_name+'. They will set up a new one at their next login.', confirm:'Reset 2FA', danger:true})) return;
+        await busy(btn,'Resetting…',async()=>{ try { await callStaff({action:'reset_mfa',id:u.id}); toast('2FA reset for '+u.full_name); } catch(x){ toast(x.message,true); } });
       }},'Reset 2FA'),
       h('button',{class:'btn ghost sm',onclick:async e=>{
         if (u.id === session.user.id) { toast('You cannot remove your own account.', true); return; }
-        if (!confirm('Remove '+u.full_name+' ('+u.email+')? They will no longer be able to log in.')) return;
-        await busy(e.target,'Removing…',async()=>{ try { await callStaff({action:'delete',id:u.id}); toast('Removed '+u.full_name); renderTeam(); } catch(x){ toast(x.message,true); } });
+        const btn = e.target;
+        if (!await ask({title:'Remove this staff account?', message:u.full_name+' ('+u.email+') will no longer be able to log in. This cannot be undone.', confirm:'Remove account', danger:true})) return;
+        await busy(btn,'Removing…',async()=>{ try { await callStaff({action:'delete',id:u.id}); toast('Removed '+u.full_name); renderTeam(); } catch(x){ toast(x.message,true); } });
       }},'Remove')))));
   renderDocAdmin();
 }

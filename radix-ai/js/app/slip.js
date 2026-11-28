@@ -7,9 +7,8 @@ const _printSlip = window.printSlip;        // the original: prints the 80 mm sl
 
 document.head.append(h('style', null, `
 #slip{display:none!important}
-dialog.slipdlg{border:0;border-radius:16px;padding:0;width:min(380px,94vw);max-height:92vh;box-shadow:0 20px 60px rgba(0,0,0,.28)}
-dialog.slipdlg::backdrop{background:rgba(0,0,0,.45)}
-.slipdlg .in{padding:20px;text-align:center;overflow:auto;max-height:92vh}
+dialog.slipdlg{width:min(380px,calc(100vw - 28px))}
+.slipdlg .in{text-align:center}
 .slipdlg .tkn{font-size:64px;font-weight:700;line-height:1;margin:8px 0;color:var(--g)}
 .slipdlg .rowc{display:flex;justify-content:space-between;gap:10px;font-size:14px;padding:4px 0}
 .slipdlg hr{border:0;border-top:1px dashed var(--line);margin:10px 0}
@@ -23,7 +22,7 @@ function slipDialog(v) {
   const d = doc(v.doctor_id);
   const print = h('button', {class: 'btn', onclick: () => _printSlip(v)}, 'Print slip');
   const close = h('button', {class: 'btn ghost', onclick: () => dlg.close()}, 'Done');
-  const dlg = h('dialog', {class: 'slipdlg', 'aria-label': 'Visit slip'}, h('div', {class: 'in'},
+  const dlg = UI.modal('Visit slip', h('div', {class: 'in'},
     h('div', {class: 'muted'}, clinicName() + ' · Visit slip'),
     h('div', {class: 'tkn', 'aria-label': 'Token ' + v.token}, tk(v.token)),
     h('div', null, h('b', null, v.name)),
@@ -33,10 +32,8 @@ function slipDialog(v) {
     h('div', {class: 'rowc'}, h('span', null, 'Access code'), h('b', null, v.code)),
     qrImg(statusLink(v.bill, v.code), 5),
     h('div', {class: 'muted', style: 'font-size:12px'}, 'Scan to see the waiting number, report and bill. Keep the slip private: the code opens the status.'),
-    print, close));
-  dlg.addEventListener('close', () => dlg.remove());
-  dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
-  document.body.append(dlg); dlg.showModal(); print.focus();
+    print, close), {cls: 'slipdlg'});
+  print.focus();
 }
 window.printSlip = slipDialog;              // the "Slip" buttons in the lists call printSlip(v)
 

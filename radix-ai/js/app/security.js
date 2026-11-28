@@ -59,8 +59,9 @@ async function renderSec() {
     box.replaceChildren(h('p', null, h('span', {class: 'paid'}, '✓ On'), ' — your login needs a code from your authenticator app.'),
       h('button', {class: 'btn ghost sm', onclick: async e => {
         if (SET.require_mfa === 'true') { toast('The clinic requires two-factor, so it cannot be removed.', true); return; }
-        if (!confirm('Remove two-factor login from your account?')) return;
-        await busy(e.target, 'Removing…', async () => { const {error} = await sb.auth.mfa.unenroll({factorId: fs[0].id}); if (error) toast(error.message, true); else { toast('Removed.'); renderSec(); } });
+        const btn = e.target;
+        if (!await ask({title: 'Remove two-factor login?', message: 'Anyone with your password will be able to log in as you.', confirm: 'Remove 2FA', danger: true})) return;
+        await busy(btn, 'Removing…', async () => { const {error} = await sb.auth.mfa.unenroll({factorId: fs[0].id}); if (error) toast(error.message, true); else { toast('Removed.'); renderSec(); } });
       }}, 'Remove'));
   } else {
     box.replaceChildren(h('p', null, h('span', {class: 'due'}, 'Off'), ' — anyone with your password can log in as you.'),

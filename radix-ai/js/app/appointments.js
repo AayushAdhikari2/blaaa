@@ -13,9 +13,6 @@ const apDayLabel = d => { const t = today(), tm = new Date(new Date(t + 'T00:00:
 const AP_ST = {requested: 'Requested', confirmed: 'Confirmed', converted: 'Arrived', cancelled: 'Cancelled', no_show: 'No-show'};
 
 document.head.append(h('style', null, `
-.apdlg{border:0;border-radius:14px;padding:0;width:min(460px,94vw);max-height:92vh;box-shadow:0 20px 60px rgba(0,0,0,.25)}
-.apdlg::backdrop{background:rgba(0,0,0,.4)} .apdlg .in{padding:18px 20px;overflow:auto;max-height:92vh}
-.apdlg .btn{min-height:44px;margin:6px 6px 0 0}
 .chip.apsel{background:var(--g);border-color:var(--g);color:#fff} .chips .chip{min-height:36px}
 .apst{display:inline-block;border-radius:6px;padding:1px 8px;font-size:11px;font-weight:700;background:#eef2f6;color:#344054}
 .apst.confirmed{background:#e3f6ec;color:#0f6b43}.apst.requested{background:#fef3c7;color:#92400e}.apst.no_show,.apst.cancelled{background:#fdecea;color:#b42318}
@@ -24,12 +21,7 @@ document.head.append(h('style', null, `
 .apx .row{align-items:flex-start} .apx .btn.sm{min-height:44px}
 `));
 
-function apDialog(title, ...nodes) {
-  const dlg = h('dialog', {class: 'apdlg', 'aria-label': title}, h('div', {class: 'in'}, h('h2', null, title), ...nodes));
-  dlg.addEventListener('close', () => dlg.remove());
-  dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
-  document.body.append(dlg); dlg.showModal(); return dlg;
-}
+const apDialog = (title, ...nodes) => UI.modal(title, h('div', {class: 'in'}, h('h2', null, title), ...nodes));
 const apCall = async (fn, args, ok) => { const {error} = await sb.rpc(fn, args); if (error) { toast(errText(error), true); return false; } if (ok) toast(ok); AP.sig = ''; kick(); render(); return true; };
 
 /* ---------- slot picker (free times for one doctor on one day) ---------- */
@@ -174,14 +166,14 @@ async function renderSchedules() {
     h('div', {class: 'card'}, h('h2', null, 'Doctor schedules'), h('label', {for: 'schdoc'}, 'Doctor'), dsel,
       h('p', {class: 'muted', style: 'font-size:13px'}, 'Patients and reception can only book times inside these hours. A doctor with no schedule has no bookable times. Add a morning and an evening block if the doctor sits twice a day.'),
       ...(s.data.length ? s.data.map(r => h('div', {class: 'row'}, h('div', null, h('b', null, AP_DAYS[r.weekday]), h('div', {class: 'muted'}, r.start_time.slice(0, 5) + ' – ' + r.end_time.slice(0, 5) + ' · ' + r.slot_min + ' min slots')),
-        h('button', {class: 'btn ghost sm', style: 'min-height:44px', onclick: async e => { if (!confirm('Remove this block?')) return; await busy(e.target, 'Removing…', async () => { await sb.from('doctor_schedules').delete().eq('id', r.id); renderSchedules(); }); }}, 'Remove'))) : empty('No hours set yet.')),
+        h('button', {class: 'btn ghost sm', style: 'min-height:44px', onclick: async e => { if (!await ask({title: 'Remove these opening hours?', message: AP_DAYS[r.weekday] + ' ' + String(r.start_time).slice(0, 5) + ' to ' + String(r.end_time).slice(0, 5) + '. Patients can no longer book those times.', confirm: 'Remove', danger: true})) return; await busy(e.target, 'Removing…', async () => { const {error} = await sb.from('doctor_schedules').delete().eq('id', r.id); if (error) toast(errText(error), true); else { toast('Opening hours removed.'); renderSchedules(); } }); }}, 'Remove'))) : empty('No hours set yet.')),
       h('h3', {style: 'margin-top:14px'}, 'Add hours'),
       h('label', {for: 'schwd'}, 'Day'), wd, h('label', {for: 'scha'}, 'From'), a, h('label', {for: 'schb'}, 'To'), b, h('label', {for: 'schl'}, 'Slot length'), len, err,
       h('div', {class: 'inl'}, h('button', {class: 'btn', onclick: e => busy(e.target, 'Saving…', () => add([+wd.value]))}, 'Add this day'),
         h('button', {class: 'btn ghost', onclick: e => busy(e.target, 'Saving…', () => add([0, 1, 2, 3, 4, 5]))}, 'Add Sunday to Friday'))),
     h('div', {class: 'card'}, h('h2', null, 'Days off'), h('p', {class: 'muted', style: 'font-size:13px'}, 'No times are offered on these days. Appointments already booked are not cancelled automatically: check the Appointments list.'),
       ...(o.data.length ? o.data.map(r => h('div', {class: 'row'}, h('div', null, h('b', null, apDayLabel(r.day)), r.note && h('div', {class: 'muted'}, r.note)),
-        h('button', {class: 'btn ghost sm', style: 'min-height:44px', onclick: async e => { await busy(e.target, 'Removing…', async () => { await sb.from('doctor_days_off').delete().eq('doctor_id', did).eq('day', r.day); renderSchedules(); }); }}, 'Remove'))) : empty('No days off set.')),
+        h('button', {class: 'btn ghost sm', style: 'min-height:44px', onclick: async e => { if (!await ask({title: 'Remove this day off?', message: r.day + ' will be open for booking again.', confirm: 'Remove', danger: true})) return; await busy(e.target, 'Removing…', async () => { const {error} = await sb.from('doctor_days_off').delete().eq('doctor_id', did).eq('day', r.day); if (error) toast(errText(error), true); else { toast('Day off removed.'); renderSchedules(); } }); }}, 'Remove'))) : empty('No days off set.')),
       h('label', {for: 'schoff'}, 'Add a day off'), offD, offN,
       h('button', {class: 'btn', style: 'margin-top:8px', onclick: e => busy(e.target, 'Saving…', async () => {
         if (!offD.value) { toast('Pick a date.', true); return; }

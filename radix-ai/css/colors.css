@@ -23,6 +23,6 @@
 
 /* ===== brand (used by the landing page AND the app) ===== */
 .logo{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:-.01em;white-space:nowrap}
-.logo .mark{flex:none;border-radius:9px}
+.logo .mark{flex:none;border-radius:0;object-fit:contain}
 .logo .ai{color:var(--g)}
 .logo .wm{white-space:nowrap}

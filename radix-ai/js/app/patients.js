@@ -14,11 +14,7 @@ document.head.append(h('style', null, `
 .ptpick{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--mint);border-radius:8px;padding:8px 10px;font-size:13px;margin-top:10px}
 .phint{font-size:12px;margin-top:4px;min-height:16px}
 .phint.ok{color:var(--g)} .phint.warn{color:#9a6700}
-dialog.ptdlg{border:0;border-radius:14px;padding:0;width:min(640px,94vw);max-height:90vh;box-shadow:0 20px 60px rgba(0,0,0,.25)}
-dialog.ptdlg::backdrop{background:rgba(0,0,0,.4)}
-.ptdlg .in{padding:18px 20px;overflow:auto;max-height:90vh}
-.ptdlg h2{margin:0 0 4px}
-.ptdlg .btn{min-height:44px} .ptdlg .row .btn.sm{min-height:36px}
+.dlg.modal .row .btn.sm{min-height:36px}
 .al{display:inline-block;background:#fdecea;color:#b42318;border-radius:6px;padding:2px 8px;font-size:12px;font-weight:600}
 `));
 
@@ -36,11 +32,7 @@ function phoneHint(p) {
 
 /* ---------- dialog helper (replaces ad-hoc popups for this feature) ---------- */
 function openDialog(...content) {
-  const dlg = h('dialog', {class: 'ptdlg', 'aria-label': 'Patient'}, h('div', {class: 'in'}, ...content));
-  dlg.addEventListener('close', () => dlg.remove());
-  dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });   // click on the backdrop closes
-  document.body.append(dlg); dlg.showModal();
-  return dlg;
+  return UI.modal('Patient', h('div', {class: 'in'}, ...content), {cls: 'wide'});
 }
 
 /* ---------- patient history dialog (reception, admin, doctor) ---------- */

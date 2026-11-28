@@ -22,7 +22,7 @@ const TABLES={doctors:[{id:'d1',name:'Dr. Sharma',dept:'General',avg_min:8,activ
  feedback:[{id:1,at:new Date().toISOString(),user_id:'u1',role:'doctor',screen:'doc',kind:'bug',message:'help',status:'new'}],
  bill_items:[{id:1,visit_id:1,description:'Consultation',amount:500}],appointments:[]};
 const sum={totals:{visits:5,completed:3,avg_wait_min:12.5,avg_consult_min:6,avg_report_min:22,billed:1500,collected:1000,unpaid:500,unpaid_count:1},per_day:[{day:today,visits:5,collected:1000}],per_doctor:[{doctor:'Dr. Sharma',dept:'General',visits:5,avg_wait_min:12,collected:1000}],unpaid:[{bill:'BL-2',name:'Sita',phone:'98',visit_date:today,billed:500}]};
-const RPC={queue_board:{clinic:'Test Clinic',doctors:[{name:'Dr. Sharma',dept:'General',serving:[1],next:[2,3],waiting:2}]},
+const RPC={public_terms:{text:'Terms.',clinic:'Test'},queue_board:{clinic:'Test Clinic',doctors:[{name:'Dr. Sharma',dept:'General',serving:[1],next:[2,3],waiting:2}]},
  pharmacy_queue:[{id:5,created_at:new Date().toISOString(),name:'Ram',age:30,bill:'BL-1',allergies:'penicillin',doctor:'Dr. Sharma',note:null,ack_reason:null,items:[{drug:'Amoxicillin 500 mg',form:'cap',rx_class:'Rx',dose:'1',days:5,qty:15,stock:0}],checks:{allergy:[{drug:'Amoxicillin',allergen:'penicillin'}],interactions:[{a:'aspirin',b:'warfarin',severity:'major',note:'bleeding'}]}}],
  bed_board:[{id:'w1',name:'General Ward',active:true,beds:[{id:'w1-1',label:'G-1',rate:100,active:true,adm:null},{id:'w1-2',label:'G-2',rate:0,active:true,adm:{id:3,visit_id:9,name:'Hari',bill:'BL-9',since:new Date().toISOString(),doctor:'Dr. Sharma',note:'obs'}}]}],
  report_summary:sum,report_rows:[{bill:'BL-1',billed:500}],audit_verify:{ok:true,checked:1,head:'abcdef0123456789abcdef'},visit_rx:[{id:7,status:'pending',items:[{drug:'Paracetamol',qty:9}]}],
@@ -42,7 +42,7 @@ const sbstub={from:t=>chain(t),rpc:(n,a)=>{calls.push('rpc:'+n);return Promise.r
 w.HTMLDialogElement.prototype.showModal=function(){this.setAttribute('open','')}; w.HTMLDialogElement.prototype.close=function(){this.removeAttribute('open'); this.dispatchEvent(new w.Event('close'))};   // jsdom has no <dialog> methods
 w.supabase={createClient:()=>sbstub}; w.qrcode=require('qrcode-generator'); w.crypto=require('crypto').webcrypto;
 const ctx=dom.getInternalVMContext();
-for(const f of ['js/config.js','js/app/app.js','js/app/print.js','js/app/security.js','js/app/admin.js','js/app/modules.js','js/app/patients.js','js/app/queue.js','js/app/slip.js','js/app/notes.js','js/app/notify.js','js/app/appointments.js','js/app/start.js']){
+for(const f of ['js/config.js','js/app/ui.js','js/app/app.js','js/app/print.js','js/app/security.js','js/app/admin.js','js/app/modules.js','js/app/patients.js','js/app/queue.js','js/app/slip.js','js/app/notes.js','js/app/notify.js','js/app/inbox.js','js/app/appointments.js','js/app/xray.js','js/app/start.js']){
   try{new vm.Script(fs.readFileSync(ROOT+f,'utf8'),{filename:f}).runInContext(ctx);}catch(e){errors.push(f+': '+e.message);}}
 const run=c=>vm.runInContext(c,ctx); const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 (async()=>{
@@ -94,7 +94,7 @@ const run=c=>vm.runInContext(c,ctx); const sleep=ms=>new Promise(r=>setTimeout(r
   // booking needs consent
   w.__authcb('SIGNED_OUT',null); await sleep(60); run("go('book')"); await sleep(30);
   $q('#bn').value='Test'; $q('#bp').value='9800000000'; $q('#bgo').click(); await sleep(60);
-  if(!/privacy notice/i.test($q('#berr').textContent)) fail('booking allowed without consent');
+  if(!/terms and conditions/i.test($q('#berr').textContent)) fail('booking allowed without consent');
   $q('#bcons').checked=true; $q('#bsms').checked=true; $q('#bgo').click(); await sleep(60);
   const bk=rpcLog.find(r=>r[0]==='request_appointment'); console.log('request_appointment params:',JSON.stringify(bk&&{c:bk[1].p_consent,s:bk[1].p_sms}));
   if(!bk||bk[1].p_consent!==true) fail('booking consent not sent');
@@ -117,21 +117,21 @@ const run=c=>vm.runInContext(c,ctx); const sleep=ms=>new Promise(r=>setTimeout(r
   console.log('PHONE admin: bottom tabs =',tabsOf().length,'(expect 5: 4 + More) | last is More =',/More/.test(tabsOf().pop().textContent));
   if(tabsOf().length!==5) fail('phone admin nav should have 5 tabs');
   tabsOf().pop().click(); await sleep(20);
-  console.log('More sheet open =',!q2('#sheet').hidden,'| items =',D2.querySelectorAll('#sheet .item').length,'(6 tabs + feedback = 7)');
-  if(q2('#sheet').hidden||D2.querySelectorAll('#sheet .item').length!==7) fail('More sheet wrong');
+  console.log('More sheet open =',!q2('#sheet').hidden,'| items =',D2.querySelectorAll('#sheet .item').length,'(8 tabs + feedback = 9)');
+  if(q2('#sheet').hidden||D2.querySelectorAll('#sheet .item').length!==9) fail('More sheet wrong');
   D2.querySelectorAll('#sheet .item')[2].click(); await sleep(150);
   console.log('after choosing item from sheet: sheet closed =',q2('#sheet').hidden,'| view =',run('view'));
   if(!q2('#sheet').hidden) fail('sheet did not close');
   PHONE=false; run("go('rec')"); await sleep(60);
   console.log('DESKTOP admin: sidebar tabs =',tabsOf().length,'(expect 10) | no More =',!tabsOf().some(t=>/More/.test(t.textContent)));
-  if(tabsOf().length!==10) fail('desktop admin should list all 10');
+  if(tabsOf().length!==12) fail('desktop admin should list all 12');
   // every tab has an icon svg and a short + long label
   if(tabsOf().some(t=>!t.querySelector('svg')||!t.querySelector('.s')||!t.querySelector('.l'))) fail('tab missing icon/label');
   PHONE=true; TABLES.profiles=[{id:'u1',full_name:'Dr',role:'doctor',doctor_id:'d1'}]; w.__authcb('SIGNED_OUT',null);await sleep(30); w.__authcb('SIGNED_IN',{user:{id:'u1'}}); await sleep(150);
-  console.log('PHONE doctor tabs =',tabsOf().length,'(5 fit, no More)'); if(tabsOf().length!==5||tabsOf().some(t=>/More/.test(t.textContent))) fail('doctor phone nav');
+  console.log('PHONE doctor tabs =',tabsOf().length,'(4 + More)'); if(tabsOf().length!==5||!tabsOf().some(t=>/More/.test(t.textContent))) fail('doctor phone nav');
   w.__authcb('SIGNED_OUT',null); await sleep(60);
   console.log('PHONE public tabs =',tabsOf().map(t=>t.querySelector('.s').textContent).join(', '));
-  if(tabsOf().length!==4) fail('public nav should have 4');
+  if(tabsOf().length!==5) fail('public nav should have 5');
   // aria-current only on active
   if(D2.querySelectorAll('#nav [aria-current]').length!==1) fail('aria-current');
   // Dispense must be ENABLED when there is no allergy (regression: h() used to write disabled="null")

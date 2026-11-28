@@ -57,7 +57,7 @@ async function renderReports() {
         h('button', {class: 'btn ghost sm', onclick: () => downloadCsv('unpaid-' + RANGE.from + '_' + RANGE.to + '.csv', data.unpaid)}, 'Export unpaid (CSV)')));
   };
   const exportRows = (btn, pii) => busy(btn, 'Preparing…', async () => {
-    if (pii && !confirm('This file will contain patient names and phone numbers. Keep it safe and delete it when done. The export is recorded in the audit log.')) return;
+    if (pii && !await ask({title: 'Export patient names and phones?', message: 'This file will contain patient names and phone numbers. Keep it safe and delete it when done. The export is recorded in the audit log.', confirm: 'Export file', danger: true})) return;
     const {data, error} = await sb.rpc('report_rows', {p_from: RANGE.from, p_to: RANGE.to, p_pii: pii});
     if (error) { toast(error.message, true); return; }
     if (!data.length) { toast('No visits in this range.', true); return; }
@@ -93,9 +93,12 @@ async function renderPrivacy() {
   const {data, error} = await sb.from('privacy_requests').select('*').order('status').order('due_at').limit(100);
   if (error) { show([h('div', {class: 'card'}, ...empty('Could not load requests: ' + error.message))]); return; }
   const setS = (r, status) => async e => {
-    const resp = status === 'in_progress' ? null : prompt(status === 'done' ? 'What was done? (shown only to staff)' : 'Why is it rejected? (for example: medical records must be kept by law)');
+    const btn = e.target;
+    const resp = status === 'in_progress' ? null : await askText(status === 'done'
+      ? {title: 'Close this privacy request', label: 'What was done? (shown only to staff)', confirm: 'Mark done', multiline: true}
+      : {title: 'Reject this privacy request', label: 'Why is it rejected? (for example: medical records must be kept by law)', confirm: 'Reject request', danger: true, multiline: true});
     if (status !== 'in_progress' && resp === null) return;
-    await busy(e.target, 'Saving…', async () => {
+    await busy(btn, 'Saving…', async () => {
       const p = {status}; if (resp) p.response = resp; if (status !== 'in_progress') p.closed_at = new Date().toISOString(); p.handled_by = session.user.id;
       const {error: er} = await sb.from('privacy_requests').update(p).eq('id', r.id); if (er) toast(er.message, true); renderPrivacy();
     });
@@ -169,7 +172,7 @@ async function renderAllergyTerms() {
           const {error} = await sb.from('allergy_terms').update({expands: list(ex.value)}).eq('term', t.term);
           toast(error ? error.message : 'Saved.', !!error); })}, 'Save'),
         h('button', {class: 'btn ghost sm', onclick: async () => { await sb.from('allergy_terms').update({active: !t.active}).eq('term', t.term); renderAllergyTerms(); }}, t.active ? 'Turn off' : 'Turn on'),
-        h('button', {class: 'btn ghost sm', onclick: async () => { if (!confirm('Delete “' + t.term + '”?')) return; await sb.from('allergy_terms').delete().eq('term', t.term); renderAllergyTerms(); }}, 'Delete')));
+        h('button', {class: 'btn ghost sm', onclick: async () => { if (!await ask({title: 'Delete this allergy term?', message: '“' + t.term + '” will no longer be checked when prescribing.', confirm: 'Delete', danger: true})) return; const {error} = await sb.from('allergy_terms').delete().eq('term', t.term); if (error) toast(error.message, true); else toast('Deleted “' + t.term + '”.'); renderAllergyTerms(); }}, 'Delete')));
   };
   show([h('div', {class: 'card'}, h('h2', null, 'Allergy terms'),
     h('p', {class: 'muted', style: 'font-size:13px'}, 'When an allergy contains one of these words (for example “NSAIDs”), every medicine whose name, generic name or class contains one of the listed drugs is blocked. The starting list is a placeholder: a pharmacist must review it.'),
@@ -186,6 +189,7 @@ async function renderAllergyTerms() {
 const SETDEF = [['clinic_name', 'Clinic name', 'Shown on slips, bills, messages and the queue board.'],
   ['site_url', 'Public address of this app', 'Example: https://yourclinic.example/app/ — used in QR codes and SMS. Leave empty while testing.'],
   ['ahead_threshold', 'Tell patients when this many are ahead', 'For example 2 sends “2 patients ahead” once.'],
+  ['low_stock_threshold', 'Low-stock alert level', 'The pharmacy is notified when in-date stock of a medicine falls below this number of units.'],
   ['retention_days', 'Keep patient details for (days)', 'After this, old visits are anonymised. Check the legal rules for medical records in your country before changing. Minimum 90.']];
 async function renderSettings() {
   SET = await loadSettings();
@@ -199,21 +203,34 @@ async function renderSettings() {
     h('button', {class: 'btn full', onclick: e => busy(e.target, 'Saving…', async () => {
       if (mfa.checked && SET.require_mfa !== 'true' && !(await totpFactors()).length) { toast('Set up 2FA for your own account first (Security tab).', true); return; }
       const rows = inputs.map(([k, el]) => ({key: k, value: el.value.trim()})).concat([{key: 'require_mfa', value: mfa.checked ? 'true' : 'false'}]);
-      const rd = +rows.find(r => r.key === 'retention_days').value, th = +rows.find(r => r.key === 'ahead_threshold').value;
+      const rd = +rows.find(r => r.key === 'retention_days').value, th = +rows.find(r => r.key === 'ahead_threshold').value, ls = +rows.find(r => r.key === 'low_stock_threshold').value;
       if (!(rd >= 90) || !(th >= 0 && th <= 20)) { toast('Retention must be 90 days or more, and “ahead” between 0 and 20.', true); return; }
+      if (!Number.isInteger(ls) || ls < 0 || ls > 100000) { toast('The low-stock alert level must be a whole number, 0 or more.', true); return; }
       const {error} = await sb.from('settings').upsert(rows);
       if (error) toast(error.message, true); else { toast('Settings saved.'); SET = await loadSettings(); }
-    })}, 'Save settings'))),
+    })}, 'Save settings')),
+      termsCard()),
     h('div', null, h('div', {class: 'card'}, h('h2', null, 'Data retention'),
       h('p', {class: 'muted', style: 'font-size:13px'}, 'Removes names, phones, reasons, allergies and report files from old visits. Bill amounts and counts stay for your reports. The audit log is never touched. This cannot be undone.'),
       h('div', {class: 'inl'}, h('button', {class: 'btn ghost sm', onclick: e => busy(e.target, 'Checking…', async () => {
         const {data, error} = await sb.rpc('retention_preview'); if (error) { toast(error.message, true); return; }
         prev.replaceChildren(h('div', {class: 'note'}, 'Older than ' + data.days + ' days (before ' + data.cutoff + '): ' + data.visits + ' visits (' + data.files + ' with report files), ' + data.appointments + ' old appointment requests, ' + data.messages + ' old messages. Files waiting to be deleted: ' + data.pending_files + '.'));
       })}, 'Preview'), h('button', {class: 'btn sm', onclick: e => busy(e.target, 'Running…', async () => {
-        if (!confirm('Anonymise old visits now? This cannot be undone.')) return;
+        if (!await ask({title: 'Anonymise old visits now?', message: 'Names, phones, reasons and allergies of visits older than the retention period are removed. This cannot be undone.', confirm: 'Anonymise now', danger: true})) return;
         const {data, error} = await sb.rpc('retention_run'); if (error) { toast(error.message, true); return; }
         toast(data.visits + ' visits anonymised.'); await purgeFiles(files);
       })}, 'Run now'), h('button', {class: 'btn ghost sm', onclick: e => busy(e.target, 'Deleting…', () => purgeFiles(files))}, 'Delete queued files')), prev, files)))]);
+}
+function termsCard() {
+  const ta = h('textarea', {rows: '14', maxlength: '6000', 'aria-label': 'Booking terms and conditions'}); ta.value = SET.booking_terms || '';
+  return h('div', {class: 'card'}, h('h2', null, 'Booking terms and conditions'),
+    h('p', {class: 'muted', style: 'font-size:13px'}, 'Shown to patients on the booking page, who must tick a box to agree before they can send a request. Leave an empty line between paragraphs. Have the text checked against the rules for clinics in your country.'),
+    ta, h('div', {class: 'inl'}, h('button', {class: 'btn', onclick: e => busy(e.target, 'Saving…', async () => {
+      const t = ta.value.trim();
+      if (t.length < 40) { toast('Write the terms first (at least a few sentences).', true); ta.focus(); return; }
+      const {error} = await sb.from('settings').upsert({key: 'booking_terms', value: t});
+      if (error) toast('Could not save the terms: ' + errText(error), true); else { toast('Booking terms saved. Patients see them now.'); SET.booking_terms = t; }
+    })}, 'Save terms'), h('button', {class: 'btn ghost', onclick: async () => { if (await ask({title: 'Discard your changes?', message: 'The text goes back to what is saved.', confirm: 'Discard', danger: true})) ta.value = SET.booking_terms || ''; }}, 'Discard changes')));
 }
 async function loadSettings() {
   const {data} = await sb.from('settings').select('key,value');

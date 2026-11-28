@@ -19,7 +19,7 @@ document.head.append(h('style', null, `
 .qbbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 10px}
 .qbbar select{width:auto;min-height:44px}
 .qbbar .btn,.qbx .btn,.qc .btn{min-height:44px}
-.qbstamp{font-size:12px;color:var(--mut)} .qbstamp.live{color:var(--g);font-weight:600}
+.qbstamp{font-size:12px;color:var(--mut)} .qbstamp.live{color:var(--g-text);font-weight:600}
 .qbgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;align-items:start}
 .qbcol h2{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
 .qbcount{font-size:12px;background:var(--mint);color:var(--ink);border-radius:99px;padding:2px 10px}
@@ -44,18 +44,14 @@ document.head.append(h('style', null, `
 .qchip{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line);border-radius:99px;padding:2px 4px 2px 10px;font-size:12px;background:#fff}
 .qchip.paused{border-color:#e0a100;background:#fff8e1}
 .qchip .btn{min-height:32px;padding:2px 10px}
-dialog.qdlg{border:0;border-radius:14px;padding:0;width:min(420px,94vw);box-shadow:0 20px 60px rgba(0,0,0,.25)}
-dialog.qdlg::backdrop{background:rgba(0,0,0,.4)} .qdlg .in{padding:18px 20px} .qdlg .btn{min-height:44px;margin:4px 6px 4px 0}
 @media (max-width:760px){.qc .btn{flex:1}}
 `));
 
 /* ---------- small dialog (used for priority and pause) ---------- */
 function qbAsk(title, ...nodes) {
-  const dlg = h('dialog', {class: 'qdlg', 'aria-label': title}, h('div', {class: 'in'}, h('h2', null, title), ...nodes,
+  const dlg = UI.modal(title, h('div', {class: 'in'}, h('h2', null, title), ...nodes,
     h('div', null, h('button', {class: 'btn ghost', onclick: () => dlg.close()}, 'Cancel'))));
-  dlg.addEventListener('close', () => dlg.remove());
-  dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
-  document.body.append(dlg); dlg.showModal(); return dlg;
+  return dlg;
 }
 async function qbCall(fn, args, ok) {                     // run a database action, show a message, redraw
   const {error} = await sb.rpc(fn, args);

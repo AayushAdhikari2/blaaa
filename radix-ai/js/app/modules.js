@@ -37,8 +37,9 @@ window.rxPanel = v => {
     const items = list.map(({drug_id, dose, days, qty}) => ({drug_id, dose, days, qty}));
     let r = await sb.rpc('create_rx', {p_visit: v.id, p_items: items});
     if (r.error && /MAJOR INTERACTION/.test(r.error.message)) {
-      const why = prompt(r.error.message.replace(/^MAJOR INTERACTION\.\s*/, 'Major interaction: ') + '\n\nType your reason to continue, or Cancel to change the medicines:');
-      if (!why || !why.trim()) { err.textContent = r.error.message; return; }
+      const why = await askText({title: 'Major drug interaction', message: r.error.message.replace(/^MAJOR INTERACTION\.\s*/, ''), label: 'Reason to continue (saved with the prescription)', multiline: true,
+        confirm: 'Prescribe anyway', cancel: 'Change medicines', danger: true, requiredText: 'Write the reason, or choose “Change medicines”.'});
+      if (!why) { err.textContent = r.error.message; return; }
       r = await sb.rpc('create_rx', {p_visit: v.id, p_items: items, p_ack: why.trim()});
     }
     if (r.error) { err.textContent = errText(r.error); return; }
@@ -48,7 +49,7 @@ window.rxPanel = v => {
     const {data} = await sb.rpc('visit_rx', {p_visit: v.id});
     past.replaceChildren(...(data || []).map(p => h('div', {class: 'muted', style: 'font-size:12px;margin-top:4px'},
       'Prescription #' + p.id + ' (' + p.status + '): ' + (p.items || []).map(i => i.drug + ' ×' + i.qty).join(', '),
-      p.status === 'pending' && [' ', h('a', {href: '#', onclick: async e => { e.preventDefault(); const {error} = await sb.rpc('cancel_rx', {p_rx: p.id}); if (error) toast(error.message, true); else { toast('Cancelled.'); loadPast(); } }}, 'Cancel')])));
+      p.status === 'pending' && [' ', h('a', {href: '#', onclick: async e => { e.preventDefault(); if (!await ask({title: 'Cancel prescription #' + p.id + '?', message: 'The pharmacy will no longer see it.', confirm: 'Cancel prescription', cancel: 'Keep it', danger: true})) return; const {error} = await sb.rpc('cancel_rx', {p_rx: p.id}); if (error) toast(error.message, true); else { toast('Prescription cancelled.'); loadPast(); } }}, 'Cancel')])));
   };
   const hist = h('details', {class: 'muted', style: 'margin-top:8px;font-size:13px'}, h('summary', null, 'Earlier visits of this patient'), h('div', {id: 'hist' + v.id}, 'Loading…'));
   let histLoaded = false;
@@ -82,12 +83,15 @@ function rxRow(p) {
   const short = p.items.filter(i => i.stock < i.qty);
   const why = h('input', {placeholder: 'Reason to continue (major interaction)', value: dr(ko, ''), maxlength: '200'}); why.oninput = () => DRAFT[ko] = why.value;
   const err = h('div', {class: 'err', style: 'margin-top:6px'});
-  const btn = h('button', {class: 'btn', disabled: allergic ? 'disabled' : null, onclick: e => busy(e.target, 'Dispensing…', async () => {
+  const btn = h('button', {class: 'btn', disabled: allergic ? 'disabled' : null, onclick: async e => {
+    const b = e.target;
     if (majors.length && !p.ack_reason && !why.value.trim()) { err.textContent = 'Enter a reason to continue despite the major interaction, or ask the doctor.'; why.focus(); return; }
+    if (!await ask({title: 'Dispense these medicines?', message: p.name + ' · ' + p.items.map(i => i.drug + ' ×' + i.qty).join(', ') + '\nStock is reduced and the charges are added to the bill.', confirm: 'Dispense'})) return;
+    return busy(b, 'Dispensing…', async () => {
     const {data: r, error: er} = await sb.rpc('dispense_rx', {p_rx: p.id, p_override: why.value.trim() || null});
     if (er) { err.textContent = errText(er); return; }
     delete DRAFT[ko]; toast('Dispensed for ' + p.name + (r.billed ? '. ' + rs(r.billed) + ' added to the bill.' : '.')); renderPha();
-  })}, 'Dispense');
+  }); }}, 'Dispense');
   return h('div', {class: 'room'},
     h('div', {class: 'row', style: 'border:0;padding:0'}, h('div', null, h('b', null, p.name + (p.age ? ' · ' + p.age + ' yrs' : '')), h('div', {class: 'muted'}, p.bill + ' · ' + p.doctor + ' · ' + hm(p.created_at))),
       h('div', null, p.allergies ? h('span', {class: 'due'}, 'Allergies: ' + p.allergies) : h('span', {class: 'muted'}, 'No allergies recorded'))),
@@ -98,7 +102,7 @@ function rxRow(p) {
     p.ack_reason && h('div', {class: 'muted', style: 'margin-top:6px'}, 'Doctor’s reason to continue: ' + p.ack_reason),
     short.length ? h('div', {class: 'due', style: 'margin-top:6px'}, 'Not enough in-date stock for: ' + short.map(i => i.drug).join(', ')) : null,
     majors.length && !p.ack_reason ? why : null, err,
-    h('div', {class: 'inl'}, btn, h('button', {class: 'btn ghost sm', onclick: async e => { if (!confirm('Cancel this prescription?')) return; const {error: er} = await sb.rpc('cancel_rx', {p_rx: p.id}); if (er) toast(er.message, true); else renderPha(); }}, 'Cancel prescription')));
+    h('div', {class: 'inl'}, btn, h('button', {class: 'btn ghost sm', onclick: async e => { if (!await ask({title: 'Cancel this prescription?', message: p.name + ' · ' + p.items.map(i => i.drug + ' ×' + i.qty).join(', ') + '\nNothing is dispensed or billed.', confirm: 'Cancel prescription', cancel: 'Keep it', danger: true})) return; const {error: er} = await sb.rpc('cancel_rx', {p_rx: p.id}); if (er) toast(er.message, true); else { toast('Prescription cancelled.'); renderPha(); } }}, 'Cancel prescription')));
 }
 async function renderStock() {
   const {data: st} = await sb.from('drug_stock').select('*');
@@ -157,7 +161,7 @@ function importCard(done) {
   const go = h('button', {class: 'btn sm', onclick: e => busy(e.target, 'Importing…', async () => {
     const f = file.files[0]; if (!f) { out.textContent = 'Choose a CSV file first.'; return; }
     const rows = parseCsv(await f.text()); if (rows.length < 2) { out.textContent = 'The file has no data rows.'; return; }
-    if (!confirm('Import ' + (rows.length - 1) + ' rows? Stock quantities in the file are ADDED to existing batches.')) return;
+    if (!await ask({title: 'Import ' + (rows.length - 1) + ' rows?', message: 'Stock quantities in the file are ADDED to existing batches. This cannot be undone.', confirm: 'Import', danger: true})) return;
     const head = rows[0].map(x => x.trim().toLowerCase()); const ix = c => head.indexOf(c);
     if (ix('name') < 0 || ix('generic') < 0) { out.textContent = 'The first row must have the headings: ' + CSV_COLS.join(', ') + ' (name and generic are required).'; return; }
     const g = (r, c) => ix(c) < 0 ? '' : (r[ix(c)] || '').trim();
@@ -208,7 +212,7 @@ async function renderWrd() {
     const tgt = h('select', null, h('option', {value: ''}, 'Move to…'), ...free.map(([x, ww]) => h('option', {value: x.id}, ww.name + ' · ' + x.label)));
     return h('div', {class: 'bed busy'}, h('b', null, b.label + ' · ' + a.name), h('div', {class: 'muted'}, a.bill + ' · ' + a.doctor + ' · since ' + new Date(a.since).toLocaleString([], {dateStyle: 'short', timeStyle: 'short'})), a.note ? h('div', {class: 'muted'}, a.note) : null,
       h('div', {class: 'inl'}, tgt, h('button', {class: 'btn ghost sm', onclick: e => tgt.value && busy(e.target, 'Moving…', async () => { const {error: er} = await sb.rpc('transfer_bed', {p_adm: a.id, p_bed: tgt.value}); if (er) toast(er.message, true); else { toast('Moved.'); renderWrd(); } })}, 'Transfer')),
-      sum, h('div', {class: 'inl'}, h('button', {class: 'btn sm', onclick: e => { if (!confirm('Discharge ' + a.name + '? Bed charges will be added to the bill.')) return; busy(e.target, 'Discharging…', async () => {
+      sum, h('div', {class: 'inl'}, h('button', {class: 'btn sm', onclick: async e => { const b = e.target; if (!await ask({title: 'Discharge ' + a.name + '?', message: a.bill + ' · ' + b.label + '. The bed becomes free and bed charges are added to the bill.', confirm: 'Discharge', danger: true})) return; busy(b, 'Discharging…', async () => {
         const {error: er} = await sb.rpc('discharge_patient', {p_adm: a.id, p_summary: sum.value}); if (er) toast(er.message, true); else { delete DRAFT[ks]; toast('Discharged ' + a.name + '.'); renderWrd(); } }); }}, 'Discharge')));
   };
   const nw = h('input', {placeholder: 'New ward name'}), wsel = h('select', null, ...data.map(w => h('option', {value: w.id}, w.name))), bl = h('input', {placeholder: 'Bed label (e.g. G-5)', style: 'max-width:150px'}), br = h('input', {type: 'number', min: '0', placeholder: 'Rs per day', style: 'max-width:110px'});
@@ -249,11 +253,11 @@ async function renderClm() {
         h('div', null, h('b', null, vname(c.visit_id)), h('div', {class: 'muted'}, (ins.find(i => i.id === c.insurer_id)?.name || '') + ' · ' + c.policy_no + ' · claimed ' + rs(c.amount) + (c.approved_amount != null ? ' · approved ' + rs(c.approved_amount) : '')), c.note && h('div', {class: 'muted'}, 'Note: ' + c.note)),
         h('div', {class: 'inl', style: 'margin:0'}, h('span', {class: 'st ' + (c.status === 'paid' ? 'done' : c.status === 'submitted' ? 'report_pending' : c.status === 'rejected' ? 'review' : '')}, c.status),
           c.status === 'draft' && h('button', {class: 'btn sm', onclick: act(c, {status: 'submitted'}, 'Submitted.')}, 'Submit'),
-          c.status === 'submitted' && h('button', {class: 'btn sm', onclick: e => { const a = prompt('Approved amount (Rs)?', c.amount); if (a === null || !(+a >= 0) || a === '') return; act(c, {status: 'approved', approved_amount: +a}, 'Approved.')(e); }}, 'Approve'),
-          c.status === 'submitted' && h('button', {class: 'btn ghost sm', onclick: e => { const n = prompt('Reason for rejection?'); if (n === null) return; act(c, {status: 'rejected', note: n}, 'Marked rejected.')(e); }}, 'Rejected'),
+          c.status === 'submitted' && h('button', {class: 'btn sm', onclick: async e => { const a = await askText({title: 'Approve this claim', label: 'Approved amount (Rs)', value: c.amount, type: 'number', min: 0, step: '0.01', confirm: 'Approve', validate: v => +v >= 0 ? '' : 'Enter an amount of 0 or more.'}); if (a === null) return; act(c, {status: 'approved', approved_amount: +a}, 'Claim approved.')(e); }}, 'Approve'),
+          c.status === 'submitted' && h('button', {class: 'btn ghost sm', onclick: async e => { const n = await askText({title: 'Reject this claim', label: 'Reason for rejection', confirm: 'Reject claim', danger: true, multiline: true}); if (n === null) return; act(c, {status: 'rejected', note: n}, 'Claim marked as rejected.')(e); }}, 'Rejected'),
           c.status === 'approved' && h('button', {class: 'btn sm', onclick: act(c, {status: 'paid'}, 'Marked paid.')}, 'Mark paid'),
           c.status === 'rejected' && h('button', {class: 'btn ghost sm', onclick: act(c, {status: 'submitted'}, 'Resubmitted.')}, 'Resubmit'),
-          c.status === 'draft' && h('a', {href: '#', class: 'muted', onclick: async e => { e.preventDefault(); if (!confirm('Delete this draft claim?')) return; await sb.from('claims').delete().eq('id', c.id); renderClm(); }}, '✕'))))) : empty('No claims yet.'))),
+          c.status === 'draft' && h('a', {href: '#', class: 'muted', role: 'button', 'aria-label': 'Delete draft claim', title: 'Delete this draft', onclick: async e => { e.preventDefault(); if (!await ask({title: 'Delete this draft claim?', message: vname(c.visit_id) + ' · ' + rs(c.amount), confirm: 'Delete draft', danger: true})) return; const {error: er} = await sb.from('claims').delete().eq('id', c.id); if (er) toast(er.message, true); else toast('Draft claim deleted.'); renderClm(); }}, '✕'))))) : empty('No claims yet.'))),
     me.role === 'admin' ? h('div', {class: 'card'}, h('h2', null, 'Insurers'), h('div', {class: 'inl'}, ni, h('button', {class: 'btn sm', onclick: async () => { if (!ni.value.trim()) return; const {error: er} = await sb.from('insurers').insert({name: ni.value.trim()}); if (er) toast(er.message, true); else renderClm(); }}, 'Add insurer')),
       ...ins.map(i => h('div', {class: 'row'}, h('span', {style: i.active ? '' : 'opacity:.5'}, i.name), h('button', {class: 'btn ghost sm', onclick: async () => { await sb.from('insurers').update({active: !i.active}).eq('id', i.id); renderClm(); }}, i.active ? 'Hide' : 'Show')))) : null);
 }

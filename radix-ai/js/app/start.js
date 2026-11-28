@@ -11,13 +11,13 @@ async function boot(s) {
       else if (!me) $('#lerr').textContent = 'Logged in, but this account has no role yet. Run staff-setup.sql with this email.';
       if (me) { SET = await loadSettings(); if (await gate()) { resetIdle(); return; } }   // gate() puts up the 2FA screen
     }
-    mountFeedback(); resetIdle();
-    go(me ? tabs()[0][0] : (['book', 'staff', 'board'].includes(view) ? view : 'pat'));
+    mountFeedback(); resetIdle(); inboxStart();   // inboxStart() stops itself when nobody is logged in
+    go(me ? tabs()[0][0] : (['book', 'staff', 'board', 'xray'].includes(view) ? view : 'pat'));
   } finally { booting = false; }
 }
 
 // Views that contain forms are not refreshed automatically (typing would be lost). Everything else refreshes every 5 s.
-const NOREFRESH = new Set(['adm', 'sec', 'wrd', 'clm', 'staff', 'book']);
+const NOREFRESH = new Set(['adm', 'sec', 'wrd', 'clm', 'staff', 'book', 'xray', 'xrv']);
 setInterval(() => {
   if (document.hidden || NOREFRESH.has(view) || !$('#mfa').hidden) return;
   if (!['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) render();

@@ -2628,3 +2628,458 @@ revoke all on function xray_is_reviewer(), xray_reserve_scan(text), xray_code_ha
 grant execute on function xray_reserve_scan(text), xray_save_report(jsonb) to service_role;
 grant execute on function xray_lookup(text,text) to anon, authenticated;
 grant execute on function xray_me(), xray_queue(text), xray_get(bigint), xray_release(bigint,jsonb,boolean), xray_reject(bigint,text) to authenticated;
+
+-- =====================================================================
+-- NOTIFICATIONS: one central in-app notification system (bell in the top bar)
+--   notifications            one row per event: who should see it, which screen it opens, how urgent
+--   notification_recipients  each person's read / unread state (no row = unread)
+--   notification_preferences each person's sound, vibration and muted categories
+-- Rules: created ONLY by database triggers after a real change, so a notification can never exist for something that did not
+-- happen. Previews never contain patient names or phone numbers (token numbers only). Staff can only read what their role
+-- allows (RLS + the same check inside every function) and can only change their OWN read state, through functions.
+-- A failing notification can never block clinical work: every trigger swallows its own errors (raises a WARNING instead).
+-- Safe to re-run.
+-- =====================================================================
+create table if not exists notifications(
+  id bigint generated always as identity primary key,
+  kind text not null,                                   -- 'category.event', e.g. 'lab.request' (category = text before the dot)
+  severity text not null default 'info' check (severity in ('info','success','warning','critical')),
+  title text not null check (length(title) between 1 and 120),
+  body text check (length(body) <= 300),
+  target_roles text[] not null default '{}' check (target_roles <@ array['admin','reception','doctor','lab','pharmacy']),
+  target_user uuid references auth.users(id) on delete cascade,   -- optional: one specific person
+  target_doctor text references doctors(id) on delete cascade,    -- optional: only that doctor's login (other roles are not affected)
+  view text check (view in ('rec','doc','lab','pha','wrd','clm','adm','board','sec')),   -- screen opened on click
+  dedupe_key text,                                      -- same key = same event: never creates a second notification
+  persistent boolean not null default false,            -- a pending task: stays pinned until the work is done (resolved_at)
+  resolved_at timestamptz,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null default now() + interval '30 days');
+create unique index if not exists notifications_dedupe_idx on notifications(dedupe_key) where dedupe_key is not null;
+create index if not exists notifications_created_idx on notifications(created_at desc);
+create index if not exists notifications_pending_idx on notifications(created_at desc) where persistent and resolved_at is null;
+
+create table if not exists notification_recipients(
+  notification_id bigint not null references notifications(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  read_at timestamptz,
+  primary key (notification_id, user_id));
+create index if not exists notification_recipients_user_idx on notification_recipients(user_id);
+
+create table if not exists notification_preferences(
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  sound boolean not null default false,
+  vibrate boolean not null default false,
+  muted_categories text[] not null default '{}',
+  updated_at timestamptz not null default now());
+
+alter table notifications enable row level security;
+alter table notification_recipients enable row level security;
+alter table notification_preferences enable row level security;
+
+-- who may see a notification (used by the policy and by every function below)
+create or replace function notif_can_see(n notifications) returns boolean
+language sql stable security definer set search_path=public as $$
+  select my_role() is not null and (
+    n.target_user = auth.uid()
+    or (my_role() = any(n.target_roles) and (n.target_doctor is null or my_role() <> 'doctor' or n.target_doctor = my_doctor()))) $$;
+
+drop policy if exists "notif read" on notifications;
+create policy "notif read" on notifications for select to authenticated using (notif_can_see(notifications));
+drop policy if exists "notif recipients read" on notification_recipients;
+create policy "notif recipients read" on notification_recipients for select to authenticated using (user_id = auth.uid() and my_role() is not null);
+drop policy if exists "notif prefs own" on notification_preferences;
+create policy "notif prefs own" on notification_preferences for all to authenticated
+  using (user_id = auth.uid() and my_role() is not null) with check (user_id = auth.uid() and my_role() is not null);
+-- the browser may read, never write, notifications and read-state directly (writes go through the functions below)
+revoke all on notifications, notification_recipients from anon, authenticated;
+grant select on notifications, notification_recipients to authenticated;
+revoke all on notification_preferences from anon;
+grant select, insert, update on notification_preferences to authenticated;
+
+-- live updates: the browser hears about new notifications at once (Supabase applies the select policy above to each event)
+do $$ begin
+  if exists(select 1 from pg_publication where pubname='supabase_realtime')
+     and not exists(select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='notifications') then
+    alter publication supabase_realtime add table public.notifications;
+  end if;
+end $$;
+
+insert into settings(key,value) values ('low_stock_threshold','20') on conflict (key) do nothing;   -- alert when in-date stock of a medicine is below this
+
+-- ---------- internal: create / resolve (never callable from the browser) ----------
+-- Returns the new id, or NULL when the same event (dedupe_key) already exists. A resolved pending task that happens again is re-opened as unread.
+create or replace function notify(p_kind text, p_severity text, p_title text, p_body text, p_roles text[], p_view text,
+  p_dedupe text default null, p_doctor text default null, p_persistent boolean default false, p_user uuid default null) returns bigint
+language plpgsql security definer set search_path=public as $$
+declare nid bigint;
+begin
+  insert into notifications(kind,severity,title,body,target_roles,target_user,target_doctor,view,dedupe_key,persistent)
+  values (p_kind, p_severity, left(p_title,120), left(p_body,300), coalesce(p_roles,'{}'), p_user, p_doctor, p_view, p_dedupe, coalesce(p_persistent,false))
+  on conflict (dedupe_key) where dedupe_key is not null
+  do update set resolved_at=null, created_at=now(), expires_at=now()+interval '30 days',
+                title=excluded.title, body=excluded.body, severity=excluded.severity
+     where notifications.resolved_at is not null
+  returning id into nid;
+  if nid is not null then delete from notification_recipients where notification_id = nid; end if;
+  return nid;
+end $$;
+
+create or replace function notif_resolve(p_key text) returns void
+language sql security definer set search_path=public as $$
+  update notifications set resolved_at = now() where dedupe_key = p_key and resolved_at is null $$;
+
+create or replace function ntf_tk(t int) returns text language sql immutable as $$ select 'T-'||lpad(t::text,2,'0') $$;
+
+-- ---------- triggers: one per module. Each one wraps its work so a notification problem never blocks the real action ----------
+-- Reception / Doctor / Lab / Billing: visits
+create or replace function ntf_visit() returns trigger language plpgsql security definer set search_path=public as $$
+declare tk text := ntf_tk(new.token); dn text; due numeric;
+begin
+  select name into dn from doctors where id = new.doctor_id;
+  if tg_op = 'INSERT' then
+    perform notify('queue.new','info','New patient in your queue', tk||' registered for '||dn, array['doctor'], 'doc', 'visit-new:'||new.id, new.doctor_id);
+    return new;
+  end if;
+  if new.status is distinct from old.status then
+    if new.status = 'report_pending' then
+      perform notify('lab.request','warning','New lab request', tk||' · '||dn||' is waiting for a report', array['lab'], 'lab', 'lab-req:'||new.id, null, true);
+    end if;
+    if old.status = 'report_pending' then perform notif_resolve('lab-req:'||new.id); end if;
+    if new.status = 'review' then
+      perform notify('lab.report','info','Lab report ready for review', tk||' is back in your queue with a report', array['doctor'], 'doc', 'review:'||new.id, new.doctor_id, true);
+    end if;
+    if old.status = 'review' then perform notif_resolve('review:'||new.id); end if;
+    if new.status = 'done' then
+      select coalesce(sum(amount),0) into due from bill_items where visit_id = new.id;
+      if due > 0 and new.paid_at is null then
+        perform notify('billing.unpaid','warning','Visit completed, bill unpaid', tk||' · Rs '||due::bigint||' still to collect', array['reception'], 'rec', 'unpaid:'||new.id, null, true);
+      end if;
+    end if;
+  end if;
+  if new.paid_at is distinct from old.paid_at then
+    if new.paid_at is not null then
+      perform notify('billing.paid','success','Payment recorded', tk||' marked as paid', array['reception','admin'], 'rec', 'paid:'||new.id||':'||extract(epoch from new.paid_at)::bigint);
+      perform notif_resolve('unpaid:'||new.id);
+    else
+      perform notify('billing.reversed','warning','Payment reversed', tk||' was changed back to unpaid', array['reception','admin'], 'rec', 'unpaid-again:'||new.id||':'||extract(epoch from clock_timestamp())::bigint);
+    end if;
+  end if;
+  return new;
+exception when others then raise warning 'notification (visit) skipped: %', sqlerrm; return new;
+end $$;
+drop trigger if exists ntf_visit_ins on visits; create trigger ntf_visit_ins after insert on visits for each row execute function ntf_visit();
+drop trigger if exists ntf_visit_upd on visits; create trigger ntf_visit_upd after update of status, paid_at on visits for each row execute function ntf_visit();
+
+-- Pharmacy: prescriptions
+create or replace function ntf_rx() returns trigger language plpgsql security definer set search_path=public as $$
+declare v visits; dn text;
+begin
+  select * into v from visits where id = new.visit_id;
+  select name into dn from doctors where id = v.doctor_id;
+  if tg_op = 'INSERT' then
+    if new.status = 'pending' then
+      perform notify('pharmacy.rx','warning','New prescription to dispense', ntf_tk(v.token)||' · '||dn, array['pharmacy'], 'pha', 'rx:'||new.id, null, true);
+    end if;
+  elsif new.status is distinct from old.status then
+    perform notif_resolve('rx:'||new.id);
+    if new.status = 'dispensed' then
+      perform notify('billing.dispensed','info','Medicines dispensed', ntf_tk(v.token)||' · pharmacy charges were added to the bill', array['reception'], 'rec', 'rx-disp:'||new.id);
+    elsif new.status = 'cancelled' then
+      perform notify('pharmacy.cancelled','info','Prescription cancelled', ntf_tk(v.token)||' · '||dn, array['pharmacy'], 'pha', 'rx-cancel:'||new.id);
+    end if;
+  end if;
+  return new;
+exception when others then raise warning 'notification (prescription) skipped: %', sqlerrm; return new;
+end $$;
+drop trigger if exists ntf_rx_ins on prescriptions; create trigger ntf_rx_ins after insert on prescriptions for each row execute function ntf_rx();
+drop trigger if exists ntf_rx_upd on prescriptions; create trigger ntf_rx_upd after update of status on prescriptions for each row execute function ntf_rx();
+
+-- Pharmacy: low stock and expiry. p_drug = null checks every medicine (daily sweep); otherwise only that one (after a stock change).
+create or replace function ntf_stock_check(p_drug bigint default null) returns void
+language plpgsql security definer set search_path=public as $$
+declare r record; s record; thr int; d0 date := (now() at time zone 'Asia/Kathmandu')::date; nm text;
+begin
+  thr := coalesce(nullif((select value from settings where key='low_stock_threshold'),'')::int, 20);
+  for r in select d.id, d.name, d.strength, coalesce(sum(st.qty) filter (where st.expiry >= d0), 0)::int as ok_qty
+           from drugs d join drug_stock st on st.drug_id = d.id
+           where d.active and (p_drug is null or d.id = p_drug) group by d.id loop
+    if r.ok_qty < thr then
+      perform notify('pharmacy.low_stock', case when r.ok_qty = 0 then 'critical' else 'warning' end,
+        'Low stock: '||r.name||coalesce(' '||r.strength,''), r.ok_qty||' in date (alert level '||thr||')', array['pharmacy','admin'], 'pha', 'lowstock:'||r.id, null, true);
+    else perform notif_resolve('lowstock:'||r.id); end if;
+  end loop;
+  for s in select st.id, st.batch, st.expiry, st.qty, d.name, d.strength from drug_stock st join drugs d on d.id = st.drug_id
+           where d.active and (p_drug is null or st.drug_id = p_drug) and st.qty > 0 and st.expiry <= d0 + 30 loop
+    nm := s.name||coalesce(' '||s.strength,'');
+    if s.expiry < d0 then
+      perform notify('pharmacy.expiry','critical','Expired stock: '||nm, 'Batch '||s.batch||' expired '||s.expiry||' · '||s.qty||' left (not dispensed)', array['pharmacy','admin'], 'pha', 'expired:'||s.id, null, true);
+    else
+      perform notify('pharmacy.expiry','warning','Expiring soon: '||nm, 'Batch '||s.batch||' expires '||s.expiry||' · '||s.qty||' left', array['pharmacy','admin'], 'pha', 'expiring:'||s.id, null, true);
+    end if;
+  end loop;
+  -- batches that are used up (or moved out of the window) no longer need attention
+  update notifications n set resolved_at = now() from drug_stock st
+   where n.resolved_at is null and (p_drug is null or st.drug_id = p_drug)
+     and ((n.dedupe_key in ('expired:'||st.id, 'expiring:'||st.id)) and (st.qty = 0 or st.expiry > d0 + 30));
+end $$;
+create or replace function ntf_stock() returns trigger language plpgsql security definer set search_path=public as $$
+begin perform ntf_stock_check(new.drug_id); return new;
+exception when others then raise warning 'notification (stock) skipped: %', sqlerrm; return new;
+end $$;
+drop trigger if exists ntf_stock_chg on drug_stock;
+create trigger ntf_stock_chg after insert or update of qty, expiry on drug_stock for each row execute function ntf_stock();
+
+-- Reception / Doctor: appointments
+create or replace function ntf_appt() returns trigger language plpgsql security definer set search_path=public as $$
+declare dn text; slot text;
+begin
+  select name into dn from doctors where id = new.doctor_id;
+  slot := coalesce(to_char(new.slot_at at time zone 'Asia/Kathmandu','Dy DD Mon, HH12:MI AM'), coalesce(new.preferred_date::text,'date to be confirmed'));
+  if tg_op = 'INSERT' then
+    if new.status = 'requested' then
+      perform notify('appt.request','warning','New appointment request', dn||' · '||slot, array['reception'], 'rec', 'appt:'||new.id, null, true);
+    elsif new.status = 'confirmed' then
+      perform notify('appt.booked','info','New appointment booked', slot, array['doctor'], 'doc', 'appt-conf:'||new.id, new.doctor_id);
+    end if;
+  elsif new.status is distinct from old.status then
+    if old.status = 'requested' then perform notif_resolve('appt:'||new.id); end if;
+    if new.status = 'confirmed' then
+      perform notify('appt.booked','info','Appointment confirmed', slot, array['doctor'], 'doc', 'appt-conf:'||new.id, new.doctor_id);
+    elsif new.status = 'cancelled' and old.status = 'confirmed' then
+      perform notify('appt.cancelled','warning','Appointment cancelled', dn||' · '||slot, array['reception'], 'rec', 'appt-cancel:'||new.id);
+      perform notify('appt.cancelled','warning','Appointment cancelled', slot, array['doctor'], 'doc', 'appt-cancel-d:'||new.id, new.doctor_id);
+    end if;
+  end if;
+  return new;
+exception when others then raise warning 'notification (appointment) skipped: %', sqlerrm; return new;
+end $$;
+drop trigger if exists ntf_appt_ins on appointments; create trigger ntf_appt_ins after insert on appointments for each row execute function ntf_appt();
+drop trigger if exists ntf_appt_upd on appointments; create trigger ntf_appt_upd after update of status on appointments for each row execute function ntf_appt();
+
+-- Wards: admissions, discharges, bed availability
+create or replace function ntf_adm() returns trigger language plpgsql security definer set search_path=public as $$
+declare v visits; wd text; bl text; freecount int;
+begin
+  select * into v from visits where id = new.visit_id;
+  select w.name, b.label into wd, bl from beds b join wards w on w.id = b.ward_id where b.id = new.bed_id;
+  if tg_op = 'INSERT' then
+    perform notify('ward.admit','info','Patient admitted', ntf_tk(v.token)||' · '||wd||' · bed '||bl, array['reception','admin'], 'wrd', 'admit:'||new.id);
+    perform notify('ward.admit','info','Your patient was admitted', ntf_tk(v.token)||' · '||wd||' · bed '||bl, array['doctor'], 'wrd', 'admit-d:'||new.id, v.doctor_id);
+    select count(*) into freecount from beds b where b.active and not exists (select 1 from admissions a where a.bed_id = b.id and a.discharged_at is null);
+    if freecount = 0 then
+      perform notify('ward.full','warning','No free beds', 'Every active bed is occupied', array['reception','doctor','admin'], 'wrd', 'beds-full', null, true);
+    end if;
+  elsif new.discharged_at is not null and old.discharged_at is null then
+    perform notify('ward.discharge','success','Patient discharged', ntf_tk(v.token)||' left '||wd||' · bed '||bl||' is free · bed charges added to the bill', array['reception','admin'], 'wrd', 'disch:'||new.id);
+    perform notify('ward.discharge','success','Your patient was discharged', ntf_tk(v.token)||' left '||wd||' · bed '||bl, array['doctor'], 'wrd', 'disch-d:'||new.id, v.doctor_id);
+    perform notif_resolve('beds-full');
+  end if;
+  return new;
+exception when others then raise warning 'notification (admission) skipped: %', sqlerrm; return new;
+end $$;
+drop trigger if exists ntf_adm_ins on admissions; create trigger ntf_adm_ins after insert on admissions for each row execute function ntf_adm();
+drop trigger if exists ntf_adm_upd on admissions; create trigger ntf_adm_upd after update of discharged_at on admissions for each row execute function ntf_adm();
+
+-- Claims (billing)
+create or replace function ntf_claim() returns trigger language plpgsql security definer set search_path=public as $$
+begin
+  if new.status is distinct from old.status and new.status in ('approved','rejected','paid') then
+    perform notify('claims.'||new.status, case new.status when 'rejected' then 'warning' else 'success' end,
+      'Insurance claim '||new.status, 'Claim of Rs '||new.amount::bigint||' was '||new.status, array['reception','admin'], 'clm', 'claim:'||new.id||':'||new.status);
+  end if;
+  return new;
+exception when others then raise warning 'notification (claim) skipped: %', sqlerrm; return new;
+end $$;
+drop trigger if exists ntf_claim_upd on claims; create trigger ntf_claim_upd after update of status on claims for each row execute function ntf_claim();
+
+-- Admin: privacy requests, staff changes, feedback, failed SMS, repeated wrong patient codes
+create or replace function ntf_admin_privacy() returns trigger language plpgsql security definer set search_path=public as $$
+begin
+  if tg_op = 'INSERT' then
+    perform notify('admin.privacy','warning','New privacy request', 'A patient asked for: '||new.kind||' · answer due '||to_char(new.due_at at time zone 'Asia/Kathmandu','DD Mon'), array['admin'], 'adm', 'privacy:'||new.id, null, true);
+  elsif new.status in ('done','rejected') and old.status not in ('done','rejected') then perform notif_resolve('privacy:'||new.id);
+  end if;
+  return new;
+exception when others then raise warning 'notification (privacy) skipped: %', sqlerrm; return new;
+end $$;
+drop trigger if exists ntf_privacy_ins on privacy_requests; create trigger ntf_privacy_ins after insert on privacy_requests for each row execute function ntf_admin_privacy();
+drop trigger if exists ntf_privacy_upd on privacy_requests; create trigger ntf_privacy_upd after update of status on privacy_requests for each row execute function ntf_admin_privacy();
+
+create or replace function ntf_admin_staff() returns trigger language plpgsql security definer set search_path=public as $$
+declare t bigint := extract(epoch from clock_timestamp())::bigint;
+begin
+  if tg_op = 'INSERT' then
+    perform notify('admin.staff','info','Staff account created', new.full_name||' · '||new.role, array['admin'], 'adm', 'staff-new:'||new.id||':'||t);
+  elsif tg_op = 'DELETE' then
+    perform notify('admin.staff','warning','Staff account removed', old.full_name||' · '||old.role, array['admin'], 'adm', 'staff-del:'||old.id||':'||t);
+    return old;
+  elsif new.role is distinct from old.role then
+    perform notify('admin.staff','warning','Staff role changed', new.full_name||': '||old.role||' to '||new.role, array['admin'], 'adm', 'staff-role:'||new.id||':'||t);
+  end if;
+  return new;
+exception when others then raise warning 'notification (staff) skipped: %', sqlerrm; return coalesce(new, old);
+end $$;
+drop trigger if exists ntf_staff_chg on profiles;
+create trigger ntf_staff_chg after insert or delete or update of role on profiles for each row execute function ntf_admin_staff();
+
+create or replace function ntf_admin_misc() returns trigger language plpgsql security definer set search_path=public as $$
+begin
+  if tg_table_name = 'feedback' then
+    perform notify('admin.feedback','info','New staff feedback', 'A '||coalesce(new.role,'staff')||' user sent feedback from the '||coalesce(new.screen,'app')||' screen', array['admin'], 'adm', 'fb:'||new.id);
+  elsif tg_table_name = 'outbox' then
+    if new.status = 'failed' and old.status is distinct from 'failed' then
+      perform notify('admin.sms','warning','SMS could not be sent', 'At least one message failed. Check Admin, Messages.', array['admin'], 'adm', 'sms-fail:'||to_char(now(),'YYYYMMDDHH24'));
+    end if;
+  elsif tg_table_name = 'lookup_attempts' then
+    if (select count(*) from lookup_attempts where bill = new.bill and at > now() - interval '15 minutes') >= 5 then
+      perform notify('security.lookup','critical','Security alert: repeated wrong access codes', 'Someone entered wrong patient access codes 5 times. That bill was locked for 15 minutes.', array['admin'], 'adm', 'lookup-lock:'||md5(new.bill)||':'||to_char(now(),'YYYYMMDDHH24'));
+    end if;
+  end if;
+  return new;
+exception when others then raise warning 'notification (admin) skipped: %', sqlerrm; return new;
+end $$;
+drop trigger if exists ntf_feedback_ins on feedback; create trigger ntf_feedback_ins after insert on feedback for each row execute function ntf_admin_misc();
+drop trigger if exists ntf_outbox_upd on outbox; create trigger ntf_outbox_upd after update of status on outbox for each row execute function ntf_admin_misc();
+drop trigger if exists ntf_lookup_ins on lookup_attempts; create trigger ntf_lookup_ins after insert on lookup_attempts for each row execute function ntf_admin_misc();
+
+-- ---------- functions the browser calls (all check the caller's role first) ----------
+-- Preferences are only used for display: muted categories hide a notification from the list and counter. Critical alerts are never hidden.
+create or replace function ntf_muted() returns text[] language sql stable security definer set search_path=public as $$
+  select coalesce((select muted_categories from notification_preferences where user_id = auth.uid()), '{}') $$;
+
+create or replace function notif_unread_count() returns int language plpgsql stable security definer set search_path=public as $$
+declare c int;
+begin
+  if my_role() is null then raise exception 'not allowed'; end if;
+  select count(*) into c from notifications n
+   where notif_can_see(n) and (n.expires_at > now() or (n.persistent and n.resolved_at is null))
+     and (n.severity = 'critical' or split_part(n.kind,'.',1) <> all(ntf_muted()))
+     and not exists (select 1 from notification_recipients r where r.notification_id = n.id and r.user_id = auth.uid() and r.read_at is not null);
+  return c;
+end $$;
+
+-- pending = pinned tasks still open; recent = everything else, newest first (50 per page, use p_before to load older ones)
+create or replace function notif_list(p_limit int default 50, p_before bigint default null) returns json
+language plpgsql stable security definer set search_path=public as $$
+declare lim int := least(greatest(coalesce(p_limit,50),1),100); res json;
+begin
+  if my_role() is null then raise exception 'not allowed'; end if;
+  with vis as (
+    select n.*, (r.read_at is not null) as is_read
+      from notifications n left join notification_recipients r on r.notification_id = n.id and r.user_id = auth.uid()
+     where notif_can_see(n) and (n.expires_at > now() or (n.persistent and n.resolved_at is null))
+       and (n.severity = 'critical' or split_part(n.kind,'.',1) <> all(ntf_muted())))
+  select json_build_object(
+    'unread', (select count(*) from vis where not is_read),
+    'pending', coalesce((select json_agg(x order by x.created_at desc) from (select id,kind,severity,title,body,view,created_at,is_read as read from vis where persistent and resolved_at is null limit 50) x),'[]'::json),
+    'recent', coalesce((select json_agg(x order by x.created_at desc, x.id desc) from (
+        select id,kind,severity,title,body,view,created_at,is_read as read from vis
+         where not (persistent and resolved_at is null) and (p_before is null or id < p_before) order by created_at desc, id desc limit lim) x),'[]'::json))
+  into res;
+  return res;
+end $$;
+
+create or replace function notif_mark(p_ids bigint[], p_read boolean) returns int language plpgsql security definer set search_path=public as $$
+declare c int;
+begin
+  if my_role() is null then raise exception 'not allowed'; end if;
+  if coalesce(array_length(p_ids,1),0) > 200 then raise exception 'too many at once'; end if;
+  insert into notification_recipients(notification_id,user_id,read_at)
+    select n.id, auth.uid(), case when p_read then now() end from notifications n where n.id = any(p_ids) and notif_can_see(n)
+  on conflict (notification_id,user_id) do update set read_at = excluded.read_at;
+  get diagnostics c = row_count; return c;
+end $$;
+
+create or replace function notif_mark_all_read() returns int language plpgsql security definer set search_path=public as $$
+declare c int;
+begin
+  if my_role() is null then raise exception 'not allowed'; end if;
+  insert into notification_recipients(notification_id,user_id,read_at)
+    select n.id, auth.uid(), now() from notifications n
+     where notif_can_see(n) and (n.expires_at > now() or (n.persistent and n.resolved_at is null))
+  on conflict (notification_id,user_id) do update set read_at = coalesce(notification_recipients.read_at, excluded.read_at);
+  get diagnostics c = row_count; return c;
+end $$;
+
+-- Time-based checks and tidy-up. The app calls this when staff log in and about once an hour; it is safe to call as often as you like.
+-- Removes expired notifications and finished tasks older than 14 days. Open pending tasks are never deleted.
+create or replace function notif_maintenance() returns void language plpgsql security definer set search_path=public as $$
+declare del int;
+begin
+  if my_role() is null then raise exception 'not allowed'; end if;
+  if my_role() in ('pharmacy','admin') then perform ntf_stock_check(null); end if;
+  with d as (delete from notifications where (expires_at < now() and (not persistent or resolved_at is not null)) or resolved_at < now() - interval '14 days' returning 1)
+  select count(*) into del from d;
+  if del > 0 then perform audit_write(auth.uid(),'NOTIF_CLEANUP','notifications','-',jsonb_build_object('deleted',del)); end if;
+end $$;
+
+-- A staff screen hit an unexpected error: tell the admin. Only a screen name and an error code are accepted (never the message, which could contain patient data). One alert per screen+code per hour.
+create or replace function notif_report_error(p_where text, p_code text) returns void language plpgsql security definer set search_path=public as $$
+declare w text := left(regexp_replace(coalesce(p_where,'app'),'[^a-z]','','g'),12); c text := left(regexp_replace(coalesce(p_code,'unknown'),'[^A-Za-z0-9_.-]','','g'),24);
+begin
+  if my_role() is null then raise exception 'not allowed'; end if;
+  perform notify('admin.error','warning','System error on the '||w||' screen', 'Error code '||c||'. The user may have seen a failed action.', array['admin'], 'adm', 'err:'||w||':'||c||':'||to_char(now(),'YYYYMMDDHH24'));
+end $$;
+
+-- ---------- permissions: internal functions are never callable from the browser ----------
+revoke all on function notify(text,text,text,text,text[],text,text,text,boolean,uuid), notif_resolve(text), ntf_tk(int), ntf_stock_check(bigint),
+  ntf_visit(), ntf_rx(), ntf_stock(), ntf_appt(), ntf_adm(), ntf_claim(), ntf_admin_privacy(), ntf_admin_staff(), ntf_admin_misc(), ntf_muted(), notif_can_see(notifications)
+  from public, anon, authenticated;
+revoke all on function notif_unread_count(), notif_list(int,bigint), notif_mark(bigint[],boolean), notif_mark_all_read(), notif_maintenance(), notif_report_error(text,text) from public, anon;
+grant execute on function notif_unread_count(), notif_list(int,bigint), notif_mark(bigint[],boolean), notif_mark_all_read(), notif_maintenance(), notif_report_error(text,text) to authenticated;
+-- the select policy calls notif_can_see as the signed-in user, so that one function must stay executable
+grant execute on function notif_can_see(notifications) to authenticated;
+-- optional hourly sweep without anyone logged in (Supabase: enable the pg_cron extension, then run once):
+--   select cron.schedule('radix-notif-sweep','0 * * * *', $$select ntf_stock_check(null)$$);
+
+-- =====================================================================
+-- X-RAY REVIEW NOTIFICATION: tell every active registered reviewer when an AI draft is waiting (no patient details in the text)
+-- =====================================================================
+create or replace function ntf_xray() returns trigger language plpgsql security definer set search_path=public as $$
+declare r record;
+begin
+  if tg_op = 'INSERT' and new.status = 'pending_review' then
+    for r in select user_id from xray_reviewers where active loop
+      perform notify('xray.review','warning','X-ray draft waiting for review', 'An AI draft report needs a doctor to check the original X-ray', array[]::text[], 'xrv', 'xray:'||new.id||':'||r.user_id, null, true, r.user_id);
+    end loop;
+  elsif tg_op = 'UPDATE' and new.status is distinct from old.status and old.status = 'pending_review' then
+    update notifications set resolved_at = now() where resolved_at is null and dedupe_key like 'xray:'||new.id||':%';
+  end if;
+  return new;
+exception when others then raise warning 'notification (xray) skipped: %', sqlerrm; return new;
+end $$;
+drop trigger if exists ntf_xray_ins on xray_reports; create trigger ntf_xray_ins after insert on xray_reports for each row execute function ntf_xray();
+drop trigger if exists ntf_xray_upd on xray_reports; create trigger ntf_xray_upd after update of status on xray_reports for each row execute function ntf_xray();
+revoke all on function ntf_xray() from public, anon, authenticated;
+-- 'xrv' (X-ray review screen) is a valid click target
+alter table notifications drop constraint if exists notifications_view_check;
+alter table notifications add constraint notifications_view_check check (view in ('rec','doc','lab','pha','wrd','clm','adm','board','sec','xrv','xray'));
+
+-- =====================================================================
+-- BOOKING TERMS AND CONDITIONS: the text patients see on the booking page. Admin edits it in Admin > Settings.
+-- Anyone (also not logged in) may READ it through public_terms(); only an admin may change it (settings policy).
+-- =====================================================================
+insert into settings(key,value) values ('booking_terms',
+'Booking is a request. Your appointment is only confirmed when reception confirms it with you by phone or SMS.
+
+Please arrive 10 minutes before your confirmed time and bring earlier reports and prescriptions. Tell reception about any allergies.
+
+If you cannot come, please call us to cancel or change the time so another patient can use it.
+
+This service is not for emergencies. If you have chest pain, trouble breathing, heavy bleeding, a head injury or severe pain, go to the nearest emergency department or call emergency services now. Do not wait for an appointment.
+
+Please give your real name and a phone number that works. We use your details only to arrange and manage your visit, as described in our privacy notice.
+
+SMS updates are optional. You can stop them at any time from your status page or by telling reception.
+
+Consultation, test and medicine charges are told by the clinic and paid at the clinic. Your bill is shown on your status page.
+
+Waiting times are estimates. They can change when an emergency or a longer consultation happens.
+
+If your doctor is not available, the clinic may change or cancel your appointment and will contact you.')
+on conflict (key) do nothing;
+create or replace function public_terms() returns json language sql stable security definer set search_path=public as $$
+  select json_build_object('text', coalesce((select value from settings where key='booking_terms'),''), 'clinic', coalesce((select value from settings where key='clinic_name'),'RADIX AI')) $$;
+revoke all on function public_terms() from public;
+grant execute on function public_terms() to anon, authenticated;
