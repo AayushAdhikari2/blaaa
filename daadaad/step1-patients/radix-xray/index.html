@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2ba67a"><meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'">
+<title>RADIX AI X-ray</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="colors.css"><link rel="stylesheet" href="xray.css">
+</head><body>
+<header><div class="wrap bar"><span class="logo">RADIX <span>AI</span> X-ray</span><a class="link" href="review.html">Doctor review</a></div></header>
+<div id="demo" class="demo" hidden><b>DEMO MODE.</b> Nothing is sent to an AI and your image is not analysed. All report text is a fixed sample.</div>
+<main class="wrap">
+  <h1>Upload your X-ray</h1>
+  <p class="muted">AI prepares a draft report. A doctor checks it before you can read it. Your X-ray image is not saved by this system.</p>
+  <div class="warn"><b>This is not an emergency service.</b> If you have trouble breathing, chest pain, heavy bleeding, a head injury, a badly bent or numb limb, or severe pain, get medical care now. Do not wait for this report.</div>
+  <nav class="tabs"><button id="t-scan" class="on" type="button">New scan</button><button id="t-report" type="button">My report</button></nav>
+
+  <section id="p-scan">
+    <form id="form" class="card" autocomplete="off" novalidate>
+      <div class="two">
+        <div><label for="name">Patient name</label><input id="name" maxlength="80" required></div>
+        <div><label for="phone">Phone</label><input id="phone" inputmode="tel" maxlength="20" required></div>
+        <div><label for="age">Age</label><input id="age" type="number" min="0" max="120" required></div>
+        <div><label for="sex">Sex</label><select id="sex" required><option value="">Choose…</option><option value="female">Female</option><option value="male">Male</option><option value="other">Other</option></select></div>
+        <div><label for="part">Body part</label><select id="part" required></select></div>
+        <div><label for="side">Side</label><select id="side" required><option value="">Choose…</option><option value="left">Left</option><option value="right">Right</option><option value="both">Both</option><option value="na">Not applicable</option></select></div>
+      </div>
+      <label for="symptoms">What is the problem? (optional)</label><textarea id="symptoms" maxlength="500" rows="3" placeholder="e.g. fell on my hand two days ago, swelling at the wrist"></textarea>
+      <label for="file">X-ray image (JPG, PNG or WebP)</label><input id="file" type="file" accept="image/jpeg,image/png,image/webp" required>
+      <p class="hint">Best: the digital X-ray file. For a printed film: hold it against an even light, take a straight photo of the whole film, with no glare. Crop or cover any printed name or ID. CT, MRI, ultrasound and DICOM files are not supported.</p>
+      <label class="chk"><input id="consent" type="checkbox"><span>I agree that my X-ray image, age, sex, body part and symptoms are sent to an AI service (Anthropic) to prepare a draft. This system does not save the image. The AI provider may keep it for a limited time (normally deleted within 30 days; longer if flagged for a policy or legal reason). My name, phone, details and report text are saved for the clinic and a doctor. Text I type, or that is printed on the image, may be sent too. If the patient is under 18, I am the parent or guardian.</span></label>
+      <button id="go" class="btn full" type="submit">Scan my X-ray</button>
+      <p id="ferr" class="err" role="alert"></p>
+    </form>
+
+    <div id="scan" class="card" hidden>
+      <h2>Scanning…</h2>
+      <div class="stage"><canvas id="canvas" aria-label="The X-ray being scanned"></canvas><div class="beam"></div></div>
+      <p id="sstat" role="status" class="muted"></p>
+      <p class="hint">The image is on this page only while it is being scanned. Keep this page open.</p>
+    </div>
+
+    <div id="done" class="card" hidden>
+      <h2>Scan finished. A doctor will now review it.</h2>
+      <p class="ok">The image has been cleared from this page and was not saved by this system. Keep your original X-ray: the doctor needs to see it.</p>
+      <div class="slip"><div><small>Report number</small><b id="dref"></b></div><div><small>Access code</small><b id="dcode"></b></div></div>
+      <p><b>Write these down or take a screenshot now.</b> The code is shown only once.</p>
+      <button id="again" class="btn ghost" type="button">Scan another X-ray</button>
+    </div>
+  </section>
+
+  <section id="p-report" hidden>
+    <form id="lform" class="card narrow" autocomplete="off">
+      <label for="lref">Report number</label><input id="lref" placeholder="XR-1A2B3C4D" autocapitalize="characters" maxlength="14">
+      <label for="lcode">Access code</label><input id="lcode" inputmode="numeric" maxlength="8" placeholder="8 digits">
+      <button class="btn full" type="submit">Open my report</button>
+      <p id="lerr" class="err" role="alert"></p>
+    </form>
+    <div id="result"></div>
+  </section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/common.js"></script>
+<script src="js/patient.js"></script>
+</body></html>
